@@ -454,8 +454,7 @@ struct CornellBox {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
-		// Set up shadow framebuffer, texture, and related parameters
-		glGenFramebuffers(1, &shadowFBO);
+		// Set up shadow texture
 		glGenTextures(1, &shadowTexture);
 		glBindTexture(GL_TEXTURE_2D, shadowTexture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -463,6 +462,9 @@ struct CornellBox {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		
+		// Set up shadow frame buffer
+		glGenFramebuffers(1, &shadowFBO);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTexture, 0);
 		glDrawBuffer(GL_NONE);
