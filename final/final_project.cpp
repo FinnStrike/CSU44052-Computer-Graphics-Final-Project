@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
@@ -11,8 +12,11 @@
 
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #define _USE_MATH_DEFINES
 #include <math.h>
+
+#define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 static GLFWwindow *window;
 static int windowWidth = 1024;
@@ -638,9 +642,20 @@ int main(void)
 	// Lower Light Intensity (starts off extremely high otherwise)
 	for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
 
+	// Time and frame rate tracking
+	static double lastTime = glfwGetTime();
+	float time = 0.0f;			// Animation time 
+	float fTime = 0.0f;			// Time for measuring fps
+	unsigned long frames = 0;
+
 	do
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// Update states for animation
+		double currentTime = glfwGetTime();
+		float deltaTime = float(currentTime - lastTime);
+		lastTime = currentTime;
 
 		// Compute camera matrix and light space matrix
 		viewMatrix = glm::lookAt(eye_center, lookat, up);
@@ -650,6 +665,20 @@ int main(void)
 
 		// Render the scene using the shadow map
 		b.render(vp, lightSpaceMatrix);
+
+		// FPS tracking 
+		// Count number of frames over a few seconds and take average
+		frames++;
+		fTime += deltaTime;
+		if (fTime > 2.0f) {
+			float fps = frames / fTime;
+			frames = 0;
+			fTime = 0;
+
+			std::stringstream stream;
+			stream << std::fixed << std::setprecision(2) << "Lab 4 | Frames per second (FPS): " << fps;
+			glfwSetWindowTitle(window, stream.str().c_str());
+		}
 
 		if (saveDepth) {
             std::string filename = "depth_camera.png";
