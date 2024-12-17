@@ -12,9 +12,20 @@ struct Camera {
     float nearPlane;
     float farPlane;
     float aspectRatio;
+    glm::vec3 initialPos;
+    glm::vec3 initialLookAt;
+    glm::vec3 initialUp;
 
     Camera(glm::vec3 pos, glm::vec3 lookAt, glm::vec3 up, float fov, float nearPlane, float farPlane, float aspectRatio)
-        : position(pos), lookAt(lookAt), up(up), fov(fov), nearPlane(nearPlane), farPlane(farPlane), aspectRatio(aspectRatio) {}
+        : position(pos), lookAt(lookAt), up(up), fov(fov), nearPlane(nearPlane), farPlane(farPlane), aspectRatio(aspectRatio),
+          initialPos(pos), initialLookAt(lookAt), initialUp(up) {}
+
+    // Reset the Camera to initial settings
+    void reset() {
+        position = initialPos;
+        lookAt = initialLookAt;
+        up = initialUp;
+    }
 
     // Calculate the view matrix (camera's position and orientation)
     glm::mat4 getViewMatrix() const {
@@ -27,9 +38,10 @@ struct Camera {
     }
 
     // Method to update the position of the camera
-    void move(const glm::vec3& delta) {
-        position += delta;
-        lookAt += delta;
+    void move(float delta) {
+        glm::vec3 forward = glm::normalize(lookAt - position);
+        position += forward * delta;
+        lookAt += forward * delta;
     }
 
     // Method to adjust the field of view (zooming in and out)

@@ -36,7 +36,7 @@ static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 static float FoV = 45.0f;
 static float zNear = 100.0f;
-static float zFar = 2000.0f; 
+static float zFar = 2000.0f;
 
 // Lighting control 
 const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
@@ -106,6 +106,11 @@ static GLuint LoadTextureTileBox(const char* texture_file_path) {
 
 	return texture;
 }
+
+bool isRotating = false;
+float currentYaw = 0.0f;
+float targetYaw = 0.0f;
+float turnSpeed = 3.0f;
 
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
@@ -777,6 +782,17 @@ int main(void)
 		float deltaTime = float(currentTime - lastTime);
 		lastTime = currentTime;
 
+		// Update turning status
+		if (isRotating) {
+			camera.rotate(0.0f, (targetYaw > currentYaw ? turnSpeed : -turnSpeed));
+			currentYaw += (targetYaw > currentYaw ? turnSpeed : -turnSpeed);
+			if (currentYaw == targetYaw) {
+				isRotating = false;
+				currentYaw = fmod(currentYaw, 360.0f);
+				targetYaw = currentYaw;
+			}
+		}
+
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
 		glm::mat4 vp = projectionMatrix * viewMatrix;
@@ -829,29 +845,41 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 {
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		eye_center = glm::vec3(-278.0f, 273.0f, 800.0f);
+		isRotating = false;
+		camera.reset(); // Reset camera and light position & intensity
 		lightPosition = glm::vec3(-278.0f, 800.0f, 0.0f);
-
+		lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
+		for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
 	}
 
 	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(0.0f, 0.0f, -20.0f)); // Move forward
+		if (!isRotating) {
+			camera.move(20.0f); // Move forward
+		}
 	}
 
 	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(0.0f, 0.0f, 20.0f)); // Move backward
+		if (!isRotating) {
+			camera.move(-20.0f); // Move backward
+		}
 	}
 
 	if (key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.rotate(0.0f, -90.0f); // Turn left
+		if (!isRotating) {
+			targetYaw = currentYaw + 90.0f; // Turn left
+			isRotating = true;
+		}
 	}
 
 	if (key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.rotate(0.0f, 90.0f); // Turn right
+		if (!isRotating) {
+			targetYaw = currentYaw - 90.0f; // Turn right
+			isRotating = true;
+		}
 	}
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
