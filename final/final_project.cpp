@@ -1,25 +1,7 @@
-#include <glad/gl.h>
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/string_cast.hpp>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb/stb_image_write.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-
 #include <render/shader.h>
-#include <render/camera.cpp>
-
-#include <vector>
-#include <iostream>
-#include <iomanip>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <random>
-#include <string>
+#include <render/texture.h>
+#include <camera.cpp>
+#include <skybox.cpp>
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -36,7 +18,7 @@ static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 static float FoV = 45.0f;
 static float zNear = 100.0f;
-static float zFar = 2000.0f;
+static float zFar = 10000.0f;
 
 // Lighting control 
 const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
@@ -82,34 +64,11 @@ static void saveDepthTexture(GLuint fbo, std::string filename) {
     stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
 }
 
-static GLuint LoadTextureTileBox(const char* texture_file_path) {
-	int w, h, channels;
-	uint8_t* img = stbi_load(texture_file_path, &w, &h, &channels, 3);
-	GLuint texture;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	// To tile textures on a box, we set wrapping to repeat
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	if (img) {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, img);
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else {
-		std::cout << "Failed to load texture " << texture_file_path << std::endl;
-	}
-	stbi_image_free(img);
-
-	return texture;
-}
-
-bool isRotating = false;
+bool isTurning = false;
 float currentYaw = 0.0f;
+float currentPitch = 0.0f;
 float targetYaw = 0.0f;
+float targetPitch = 0.0f;
 float turnSpeed = 3.0f;
 
 // Set up Camera
@@ -755,6 +714,10 @@ int main(void)
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 
+	// Create the skybox
+	Skybox sky;
+	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
+
     // Create the classical Cornell Box
 	CornellBox b;
 	b.initialize();
@@ -783,13 +746,24 @@ int main(void)
 		lastTime = currentTime;
 
 		// Update turning status
-		if (isRotating) {
-			camera.rotate(0.0f, (targetYaw > currentYaw ? turnSpeed : -turnSpeed));
-			currentYaw += (targetYaw > currentYaw ? turnSpeed : -turnSpeed);
-			if (currentYaw == targetYaw) {
-				isRotating = false;
-				currentYaw = fmod(currentYaw, 360.0f);
-				targetYaw = currentYaw;
+		if (isTurning) {
+			if (currentYaw != targetYaw) {
+				camera.rotate(0.0f, (targetYaw > currentYaw ? turnSpeed : -turnSpeed));
+				currentYaw += (targetYaw > currentYaw ? turnSpeed : -turnSpeed);
+				if (currentYaw == targetYaw) {
+					isTurning = false;
+					currentYaw = fmod(currentYaw, 360.0f);
+					targetYaw = currentYaw;
+				}
+			} 
+			if (currentPitch != targetPitch) {
+				camera.rotate((targetPitch > currentPitch ? turnSpeed : -turnSpeed), 0.0f);
+				currentPitch += (targetPitch > currentPitch ? turnSpeed : -turnSpeed);
+				if (currentPitch == targetPitch) {
+					isTurning = false;
+					currentPitch = fmod(currentPitch, 360.0f);
+					targetPitch = currentPitch;
+				}
 			}
 		}
 
@@ -803,6 +777,7 @@ int main(void)
 
 		// Render the scene using the shadow map
 		b.render(vp, lightSpaceMatrix);
+		sky.render(vp);
 
 		// FPS tracking 
 		// Count number of frames over a few seconds and take average
@@ -845,7 +820,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 {
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		isRotating = false;
+		isTurning = false;
 		camera.reset(); // Reset camera and light position & intensity
 		lightPosition = glm::vec3(-278.0f, 800.0f, 0.0f);
 		lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
@@ -854,42 +829,48 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 
 	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isRotating) {
+		if (!isTurning) {
 			camera.move(20.0f); // Move forward
 		}
 	}
 
 	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isRotating) {
+		if (!isTurning) {
 			camera.move(-20.0f); // Move backward
 		}
 	}
 
 	if (key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isRotating) {
+		if (!isTurning) {
 			targetYaw = currentYaw + 90.0f; // Turn left
-			isRotating = true;
+			isTurning = true;
 		}
 	}
 
 	if (key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isRotating) {
+		if (!isTurning) {
 			targetYaw = currentYaw - 90.0f; // Turn right
-			isRotating = true;
+			isTurning = true;
 		}
 	}
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		lightPosition.z -= 20.0f;
+		if (!isTurning) {
+			targetPitch = currentPitch - 90.0f; // Look up
+			isTurning = true;
+		}
 	}
 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		lightPosition.z += 20.0f;
+		if (!isTurning) {
+			targetPitch = currentPitch + 90.0f; // Look down
+			isTurning = true;
+		}
 	}
 	    
 	if (key == GLFW_KEY_SPACE && (action == GLFW_REPEAT || action == GLFW_PRESS)) 

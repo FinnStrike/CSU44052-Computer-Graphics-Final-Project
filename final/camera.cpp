@@ -1,8 +1,4 @@
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
+#include <render/headers.h>
 
 struct Camera {
     glm::vec3 position;

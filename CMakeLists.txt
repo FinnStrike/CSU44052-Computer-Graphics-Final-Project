@@ -19,6 +19,7 @@ include_directories(
 add_executable(final_project
 	final/final_project.cpp
 	final/render/shader.cpp
+	final/render/texture.cpp
 )
 target_link_libraries(final_project
 	${OPENGL_LIBRARY}

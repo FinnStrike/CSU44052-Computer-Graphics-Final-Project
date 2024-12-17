@@ -1,11 +1,5 @@
 #include "shader.h"
 
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-
 // Utility function to read a file into a string
 std::string ReadFile(const char* file_path) {
     std::ifstream file(file_path);
