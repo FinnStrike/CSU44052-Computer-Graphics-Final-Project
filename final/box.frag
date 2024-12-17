@@ -4,12 +4,18 @@ in vec3 color;
 in vec3 worldPosition;
 in vec3 worldNormal;
 
+// Receive UV input to this fragment shader
+in vec2 uv;
+
 out vec3 finalColor;
 
 // Uniforms
 uniform vec3 lightPosition;
 uniform vec3 lightIntensity;
 uniform float exposure;
+
+// Access the texture sampler
+uniform sampler2D textureSampler;
 
 // Shadow-related uniforms
 uniform sampler2D shadowMap;
@@ -53,8 +59,8 @@ void main()
         shadow = (lightCoords.z >= closestDepth + 1e-3) ? 0.2 : 1.0;
     }
 
-    // Apply the shadow factor to the diffuse color
-    diffuse *= shadow;
+    // Apply the shadow factor and texture to the diffuse color
+    diffuse *= texture(textureSampler, uv).rgb * shadow;
 
     // Apply exposure to the lighting
     vec3 exposedColor = diffuse * exposure;

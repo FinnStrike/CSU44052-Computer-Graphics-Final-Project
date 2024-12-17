@@ -7,6 +7,8 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 #include <render/shader.h>
 #include <render/camera.cpp>
@@ -16,6 +18,8 @@
 #include <iomanip>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <random>
+#include <string>
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -76,6 +80,31 @@ static void saveDepthTexture(GLuint fbo, std::string filename) {
     for (int i = 0; i < width * height; ++i) img[3*i] = img[3*i+1] = img[3*i+2] = depth[i] * 255;
 
     stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
+}
+
+static GLuint LoadTextureTileBox(const char* texture_file_path) {
+	int w, h, channels;
+	uint8_t* img = stbi_load(texture_file_path, &w, &h, &channels, 3);
+	GLuint texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	// To tile textures on a box, we set wrapping to repeat
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	if (img) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, img);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else {
+		std::cout << "Failed to load texture " << texture_file_path << std::endl;
+	}
+	stbi_image_free(img);
+
+	return texture;
 }
 
 // Set up Camera
@@ -412,15 +441,103 @@ struct CornellBox {
 		56, 58, 59,
 	};
 
+	GLfloat uv_buffer_data[120] = {
+	// Cornell Box
+		// Floor
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f,
+
+		// Ceiling
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f,
+
+		// Left Wall
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f,
+
+		// Right Wall
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f,
+
+		// Back wall
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f,
+
+	// Short Box
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+	// Tall Box
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+		0.0f, 0.0f,
+	};
+
 	// OpenGL buffers
 	GLuint vertexArrayID;
 	GLuint vertexBufferID;
 	GLuint indexBufferID;
 	GLuint colorBufferID;
 	GLuint normalBufferID;
+	GLuint uvBufferID;
+	GLuint textureID;
 
 	// Shader variable IDs
 	GLuint mvpMatrixID;
+	GLuint textureSamplerID;
 	GLuint lightPositionID;
 	GLuint lightIntensityID;
 	GLuint lightSpaceMatrixID;
@@ -438,22 +555,23 @@ struct CornellBox {
 		glGenVertexArrays(1, &vertexArrayID);
 		glBindVertexArray(vertexArrayID);
 
-		// Create a vertex buffer object to store the vertex data		
+		// Create buffers for vertex, color, normal, UV, and index data
 		glGenBuffers(1, &vertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data), vertex_buffer_data, GL_STATIC_DRAW);
 
-		// Create a vertex buffer object to store the color data
 		glGenBuffers(1, &colorBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, colorBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(color_buffer_data), color_buffer_data, GL_STATIC_DRAW);
 
-		// Create a vertex buffer object to store the vertex normals		
 		glGenBuffers(1, &normalBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
 
-		// Create an index buffer object to store the index data that defines triangle faces
+		glGenBuffers(1, &uvBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data), uv_buffer_data, GL_STATIC_DRAW);
+
 		glGenBuffers(1, &indexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
@@ -462,76 +580,75 @@ struct CornellBox {
 		glGenTextures(1, &shadowTexture);
 		glBindTexture(GL_TEXTURE_2D, shadowTexture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		
+
 		// Set up shadow frame buffer
 		glGenFramebuffers(1, &shadowFBO);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTexture, 0);
 		glDrawBuffer(GL_NONE);
 		glReadBuffer(GL_NONE);
+
+		// Check if framebuffer is complete
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "Error: Shadow framebuffer is not complete!" << std::endl;
+		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-		// Create and compile our GLSL program from the shaders
+		// Load shaders for rendering and depth mapping
 		programID = LoadShadersFromFile("../final/box.vert", "../final/box.frag");
-		if (programID == 0)
-		{
+		if (programID == 0) {
 			std::cerr << "Failed to load box shaders." << std::endl;
 		}
 
-		// Load shaders for depth mapping (shadow shader program)
 		depthProgramID = LoadShadersFromFile("../final/depth.vert", "../final/depth.frag");
 		if (depthProgramID == 0) {
 			std::cerr << "Failed to load depth shaders." << std::endl;
 		}
 
-		// Get a handle for our "MVP" uniform
+		// Get uniform locations
 		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 		lightPositionID = glGetUniformLocation(programID, "lightPosition");
 		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
 		exposureID = glGetUniformLocation(programID, "exposure");
 		lightSpaceMatrixID = glGetUniformLocation(programID, "lightSpaceMatrix");
-		glBindTexture(GL_TEXTURE_2D, shadowTexture);
-
-		// And do the same for depth
 		depthMatrixID = glGetUniformLocation(depthProgramID, "MVP");
+
+		// Load texture and configure texture sampler
+		textureID = LoadTextureTileBox("../final/facade4.jpg");
+		glBindTexture(GL_TEXTURE_2D, textureID); // Ensure the texture is bound for configuration
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glBindTexture(GL_TEXTURE_2D, 0); // Unbind after configuration
+		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
 	}
 
 	void render(glm::mat4 cameraMatrix, glm::mat4 lightSpaceMatrix) {
-		// Render scene from light's perspective
+		// Shadow pass
 		glUseProgram(depthProgramID);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
-		// Set the light space matrix
 		glm::mat4 lightMVP = lightSpaceMatrix;
 		glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &lightMVP[0][0]);
 
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-
-		// Draw the objects to the shadow map (depth only)
-		glDrawElements(
-			GL_TRIANGLES, 
-			90, 
-			GL_UNSIGNED_INT, 
-			(void*)0
-		);
-
+		glDrawElements(GL_TRIANGLES, 90, GL_UNSIGNED_INT, (void*)0);
 		glDisableVertexAttribArray(0);
 
-		// Unbind the framebuffer
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-		// Render scene normally with shadow map
+		// Normal pass
 		glUseProgram(programID);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
@@ -545,35 +662,32 @@ struct CornellBox {
 		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
 		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
+		glEnableVertexAttribArray(3);
+		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
+		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// Set model-view-projection matrix
-		glm::mat4 mvp = cameraMatrix;
-		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glUniform1i(textureSamplerID, 0);
 
-		// Set light data 
-		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
-		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-		glUniform1f(exposureID, exposure);
-		glUniformMatrix4fv(lightSpaceMatrixID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
-
-		// Pass the shadow map texture to the shader
 		GLuint shadowMapID = glGetUniformLocation(programID, "shadowMap");
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, shadowTexture);
 		glUniform1i(shadowMapID, 1);
 
-		// Draw the box
-		glDrawElements(
-			GL_TRIANGLES,      // mode
-			90,    			   // number of indices
-			GL_UNSIGNED_INT,   // type
-			(void*)0           // element array buffer offset
-		);
+		glm::mat4 mvp = cameraMatrix;
+		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
+		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
+		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
+		glUniform1f(exposureID, exposure);
+		glUniformMatrix4fv(lightSpaceMatrixID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+
+		glDrawElements(GL_TRIANGLES, 90, GL_UNSIGNED_INT, (void*)0);
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
 		glDisableVertexAttribArray(2);
+		glDisableVertexAttribArray(3);
 	}
 
 	void cleanup() {
