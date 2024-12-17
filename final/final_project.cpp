@@ -48,7 +48,7 @@ static int shadowMapWidth = 1024;
 static int shadowMapHeight = 1024;
 
 // DONE: set these parameters 
-static float depthFoV = 90.0f;
+static float depthFoV = 120.0f;
 static float depthNear = 10.0f;
 static float depthFar = 2000.0f;
 
@@ -643,6 +643,7 @@ int main(void)
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
+	lightProjection = glm::perspective(glm::radians(depthFoV), (float)shadowMapWidth / shadowMapHeight, depthNear, depthFar);
 
 	// Lower Light Intensity (starts off extremely high otherwise)
 	for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
