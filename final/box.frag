@@ -54,9 +54,12 @@ void main()
     } else {
         // Sample the closest depth from the shadow map
         float closestDepth = texture(shadowMap, lightCoords.xy).r;
+
+        // Create a dynamic bias to prevent shadow acne
+        float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
     
         // Check if the fragment is in shadow
-        shadow = (lightCoords.z >= closestDepth + 1e-3) ? 0.2 : 1.0;
+        shadow = (lightCoords.z >= closestDepth + bias) ? 0.2 : 1.0;
     }
 
     // Apply the shadow factor and texture to the diffuse color

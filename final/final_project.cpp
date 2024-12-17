@@ -35,7 +35,7 @@ static glm::vec3 eye_center(-278.0f, 273.0f, 800.0f);
 static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 static float FoV = 45.0f;
-static float zNear = 600.0f;
+static float zNear = 100.0f;
 static float zFar = 2000.0f; 
 
 // Lighting control 
