@@ -9,6 +9,7 @@
 #include <stb/stb_image_write.h>
 
 #include <render/shader.h>
+#include <render/camera.cpp>
 
 #include <vector>
 #include <iostream>
@@ -47,7 +48,7 @@ static int shadowMapWidth = 1024;
 static int shadowMapHeight = 1024;
 
 // DONE: set these parameters 
-static float depthFoV = 120.0f;
+static float depthFoV = 90.0f;
 static float depthNear = 10.0f;
 static float depthFar = 2000.0f;
 
@@ -76,6 +77,9 @@ static void saveDepthTexture(GLuint fbo, std::string filename) {
 
     stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
 }
+
+// Set up Camera
+Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
 
 struct CornellBox {
 
@@ -409,9 +413,9 @@ struct CornellBox {
 	};
 
 	// OpenGL buffers
-	GLuint vertexArrayID; 
-	GLuint vertexBufferID; 
-	GLuint indexBufferID; 
+	GLuint vertexArrayID;
+	GLuint vertexBufferID;
+	GLuint indexBufferID;
 	GLuint colorBufferID;
 	GLuint normalBufferID;
 
@@ -638,8 +642,7 @@ int main(void)
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
-	projectionMatrix = glm::perspective(glm::radians(FoV), (float)windowWidth / windowHeight, zNear, zFar);
-	lightProjection = glm::perspective(glm::radians(depthFoV), (float)shadowMapWidth / shadowMapHeight, depthNear, depthFar);
+	projectionMatrix = camera.getProjectionMatrix();
 
 	// Lower Light Intensity (starts off extremely high otherwise)
 	for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
@@ -659,10 +662,12 @@ int main(void)
 		float deltaTime = float(currentTime - lastTime);
 		lastTime = currentTime;
 
-		// Compute camera matrix and light space matrix
-		viewMatrix = glm::lookAt(eye_center, lookat, up);
-		lightView = glm::lookAt(lightPosition, glm::vec3(lightPosition.x, lightPosition.y-1, lightPosition.z), lightUp);
+		// Compute camera matrix
+		viewMatrix = camera.getViewMatrix();
 		glm::mat4 vp = projectionMatrix * viewMatrix;
+
+		// Compute light space matrix
+		lightView = glm::lookAt(lightPosition, glm::vec3(lightPosition.x, lightPosition.y - 1, lightPosition.z), lightUp);
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		// Render the scene using the shadow map
@@ -716,22 +721,22 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 
 	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		eye_center.y += 20.0f;
+		camera.move(glm::vec3(0.0f, 0.0f, -20.0f)); // Move forward
 	}
 
 	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		eye_center.y -= 20.0f;
+		camera.move(glm::vec3(0.0f, 0.0f, 20.0f)); // Move backward
 	}
 
 	if (key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		eye_center.x -= 20.0f;
+		camera.rotate(0.0f, -90.0f); // Turn left
 	}
 
 	if (key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		eye_center.x += 20.0f;
+		camera.rotate(0.0f, 90.0f); // Turn right
 	}
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
