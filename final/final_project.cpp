@@ -2,6 +2,8 @@
 #include <render/texture.h>
 #include <camera.cpp>
 #include <skybox.cpp>
+#include <geometry.cpp>
+#include <lighting.cpp>
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -75,9 +77,6 @@ float turnSpeed = 3.0f;
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
 
 struct CornellBox {
-
-	// Refer to original Cornell Box data 
-	// from https://www.graphics.cornell.edu/online/box/data.html
 
 	GLfloat vertex_buffer_data[180] = {
 	// Cornell Box
@@ -174,7 +173,6 @@ struct CornellBox {
 		-423.0,   0.0, -247.0,
 	};
 
-	// DONE: set vertex normals properly
 	GLfloat normal_buffer_data[180] = {
 	// Cornell Box
 		// Floor 
@@ -514,54 +512,10 @@ struct CornellBox {
 	GLuint shadowFBO;
 	GLuint shadowTexture;
 
+	Geometry geometry;
+	Lighting lighting;
+
 	void initialize() {
-		// Create a vertex array object
-		glGenVertexArrays(1, &vertexArrayID);
-		glBindVertexArray(vertexArrayID);
-
-		// Create buffers for vertex, color, normal, UV, and index data
-		glGenBuffers(1, &vertexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data), vertex_buffer_data, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &colorBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, colorBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(color_buffer_data), color_buffer_data, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &normalBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &uvBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data), uv_buffer_data, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &indexBufferID);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
-
-		// Set up shadow texture
-		glGenTextures(1, &shadowTexture);
-		glBindTexture(GL_TEXTURE_2D, shadowTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		// Set up shadow frame buffer
-		glGenFramebuffers(1, &shadowFBO);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTexture, 0);
-		glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);
-
-		// Check if framebuffer is complete
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-			std::cerr << "Error: Shadow framebuffer is not complete!" << std::endl;
-		}
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 		// Load shaders for rendering and depth mapping
 		programID = LoadShadersFromFile("../final/box.vert", "../final/box.frag");
 		if (programID == 0) {
@@ -573,97 +527,25 @@ struct CornellBox {
 			std::cerr << "Failed to load depth shaders." << std::endl;
 		}
 
-		// Get uniform locations
-		mvpMatrixID = glGetUniformLocation(programID, "MVP");
-		lightPositionID = glGetUniformLocation(programID, "lightPosition");
-		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
-		exposureID = glGetUniformLocation(programID, "exposure");
-		lightSpaceMatrixID = glGetUniformLocation(programID, "lightSpaceMatrix");
-		depthMatrixID = glGetUniformLocation(depthProgramID, "MVP");
-
-		// Load texture and configure texture sampler
-		textureID = LoadTextureTileBox("../final/facade4.jpg");
-		glBindTexture(GL_TEXTURE_2D, textureID); // Ensure the texture is bound for configuration
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glBindTexture(GL_TEXTURE_2D, 0); // Unbind after configuration
-		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+		// Initialize Geometry and Lighting
+		geometry.initialize(programID, vertex_buffer_data, index_buffer_data, color_buffer_data, normal_buffer_data, uv_buffer_data,
+							sizeof(vertex_buffer_data), sizeof(index_buffer_data), sizeof(color_buffer_data), sizeof(normal_buffer_data), sizeof(uv_buffer_data),
+							"../final/facade4.jpg");
+		lighting.initialize(programID, depthProgramID, shadowMapWidth, shadowMapHeight);
 	}
 
 	void render(glm::mat4 cameraMatrix, glm::mat4 lightSpaceMatrix) {
-		// Shadow pass
-		glUseProgram(depthProgramID);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		glm::mat4 lightMVP = lightSpaceMatrix;
-		glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &lightMVP[0][0]);
-
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-		glDrawElements(GL_TRIANGLES, 90, GL_UNSIGNED_INT, (void*)0);
-		glDisableVertexAttribArray(0);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		// Normal pass
-		glUseProgram(programID);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, colorBufferID);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glEnableVertexAttribArray(2);
-		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glEnableVertexAttribArray(3);
-		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
-		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glUniform1i(textureSamplerID, 0);
-
-		GLuint shadowMapID = glGetUniformLocation(programID, "shadowMap");
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, shadowTexture);
-		glUniform1i(shadowMapID, 1);
-
-		glm::mat4 mvp = cameraMatrix;
-		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
-		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
-		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-		glUniform1f(exposureID, exposure);
-		glUniformMatrix4fv(lightSpaceMatrixID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
-
-		glDrawElements(GL_TRIANGLES, 90, GL_UNSIGNED_INT, (void*)0);
-
-		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
-		glDisableVertexAttribArray(2);
-		glDisableVertexAttribArray(3);
+		lighting.setLightProperties(lightPosition, lightIntensity, exposure);
+		lighting.performShadowPass(lightSpaceMatrix, geometry.vertexBufferID, geometry.indexBufferID, geometry.indexCount);
+		lighting.prepareLighting();
+		geometry.render(cameraMatrix);
 	}
 
 	void cleanup() {
-		glDeleteBuffers(1, &vertexBufferID);
-		glDeleteBuffers(1, &colorBufferID);
-		glDeleteBuffers(1, &indexBufferID);
-		glDeleteBuffers(1, &normalBufferID);
-		glDeleteVertexArrays(1, &vertexArrayID);
 		glDeleteProgram(programID);
 		glDeleteProgram(depthProgramID);
-		glDeleteFramebuffers(1, &shadowFBO);
-		glDeleteTextures(1, &shadowTexture);
+		lighting.cleanup();
+		geometry.cleanup();
 	}
 }; 
 
@@ -726,9 +608,6 @@ int main(void)
     glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
 	lightProjection = glm::perspective(glm::radians(depthFoV), (float)shadowMapWidth / shadowMapHeight, depthNear, depthFar);
-
-	// Lower Light Intensity (starts off extremely high otherwise)
-	for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
 
 	// Time and frame rate tracking
 	static double lastTime = glfwGetTime();
@@ -822,9 +701,8 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	{
 		isTurning = false;
 		camera.reset(); // Reset camera and light position & intensity
-		lightPosition = glm::vec3(-278.0f, 800.0f, 0.0f);
+		lightPosition = glm::vec3(-275.0f, 500.0f, -275.0f);
 		lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-		for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
 	}
 
 	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
