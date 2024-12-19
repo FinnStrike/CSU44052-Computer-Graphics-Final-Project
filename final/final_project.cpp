@@ -860,7 +860,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		if (!isTurning) {
-			targetPitch = currentPitch - 90.0f; // Look up
+			targetPitch = currentPitch + 90.0f; // Look up
 			isTurning = true;
 		}
 	}
@@ -868,7 +868,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		if (!isTurning) {
-			targetPitch = currentPitch + 90.0f; // Look down
+			targetPitch = currentPitch - 90.0f; // Look down
 			isTurning = true;
 		}
 	}

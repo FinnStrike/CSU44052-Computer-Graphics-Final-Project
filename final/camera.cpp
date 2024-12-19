@@ -51,14 +51,22 @@ struct Camera {
     void rotate(float angleX, float angleY) {
         // Rotate around the Y-axis (vertical rotation, yaw)
         glm::mat4 rotationY = glm::rotate(glm::mat4(1.0f), glm::radians(angleY), up);
-        glm::vec3 newLookAt = glm::vec3(rotationY * glm::vec4(lookAt - position, 1.0f)) + position;
 
-        // Now calculate the right vector and the new up vector
-        glm::vec3 right = glm::normalize(glm::cross(newLookAt - position, up));
-        glm::vec3 newUp = glm::normalize(glm::cross(right, newLookAt - position));
+        // Calculate the right vector
+        glm::vec3 forward = glm::normalize(lookAt - position);
+        glm::vec3 right = glm::normalize(glm::cross(forward, up));
 
-        // Update the camera's lookAt and up direction
-        lookAt = newLookAt;
-        up = newUp;
+        // Rotate around the X-axis (horizontal rotation, pitch)
+        glm::mat4 rotationX = glm::rotate(glm::mat4(1.0f), glm::radians(angleX), right);
+
+        // Combine the rotations
+        glm::mat4 rotation = rotationX * rotationY;
+
+        // Apply the combined rotation to the forward vector
+        glm::vec3 rotatedForward = glm::vec3(rotation * glm::vec4(forward, 1.0f));
+        lookAt = position + rotatedForward;
+
+        // Update the up vector
+        up = glm::normalize(glm::vec3(rotation * glm::vec4(up, 0.0f)));
     }
 };
