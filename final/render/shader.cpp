@@ -1,4 +1,8 @@
 #include "shader.h"
+#ifndef TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#endif
+#include <tiny_gltf.h>
 
 // Utility function to read a file into a string
 std::string ReadFile(const char* file_path) {

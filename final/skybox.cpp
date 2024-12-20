@@ -184,7 +184,7 @@ struct Skybox {
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
 		// Create and compile our GLSL program from the shaders
-		programID = LoadShadersFromFile("../final/sky.vert", "../final/sky.frag");
+		programID = LoadShadersFromFile("../final/shader/sky.vert", "../final/shader/sky.frag");
 		if (programID == 0)
 		{
 			std::cerr << "Failed to load shaders." << std::endl;
@@ -194,7 +194,7 @@ struct Skybox {
 		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 
 		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox("../final/sky.png");
+		textureID = LoadTextureTileBox("../final/assets/sky.png");
 
 		// Get a handle for our "textureSampler" uniform
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");

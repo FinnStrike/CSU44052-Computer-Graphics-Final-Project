@@ -470,12 +470,12 @@ struct CornellBox {
 
 	void initialize() {
 		// Load shaders for rendering and depth mapping
-		programID = LoadShadersFromFile("../final/box.vert", "../final/box.frag");
+		programID = LoadShadersFromFile("../final/shader/box.vert", "../final/shader/box.frag");
 		if (programID == 0) {
 			std::cerr << "Failed to load box shaders." << std::endl;
 		}
 
-		depthProgramID = LoadShadersFromFile("../final/depth.vert", "../final/depth.frag");
+		depthProgramID = LoadShadersFromFile("../final/shader/depth.vert", "../final/shader/depth.frag");
 		if (depthProgramID == 0) {
 			std::cerr << "Failed to load depth shaders." << std::endl;
 		}
@@ -483,7 +483,7 @@ struct CornellBox {
 		// Initialize Geometry and Lighting
 		geometry.initialize(programID, vertex_buffer_data, index_buffer_data, color_buffer_data, normal_buffer_data, uv_buffer_data,
 							sizeof(vertex_buffer_data), sizeof(index_buffer_data), sizeof(color_buffer_data), sizeof(normal_buffer_data), sizeof(uv_buffer_data),
-							"../final/facade4.jpg");
+							"../final/assets/facade4.jpg");
 		lighting.initialize(programID, depthProgramID, shadowMapWidth, shadowMapHeight);
 	}
 

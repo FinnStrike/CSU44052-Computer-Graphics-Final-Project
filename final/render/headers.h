@@ -7,6 +7,7 @@
 
 #include <stb/stb_image_write.h>
 #include <stb/stb_image.h>
+#include <tiny_gltf.h>
 
 #include <vector>
 #include <iostream>
