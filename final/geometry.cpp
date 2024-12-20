@@ -66,6 +66,8 @@ public:
     }
 
     void render(glm::mat4 cameraMatrix) {
+        glBindVertexArray(vertexArrayID);
+
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);

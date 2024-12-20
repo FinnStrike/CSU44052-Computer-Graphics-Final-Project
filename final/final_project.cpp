@@ -2,10 +2,9 @@
 #include <render/texture.h>
 #include <camera.cpp>
 #include <skybox.cpp>
+#include <bot.cpp>
 #include <geometry.cpp>
 #include <lighting.cpp>
-
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 static GLFWwindow *window;
 static int windowWidth = 1024;
@@ -46,6 +45,10 @@ float currentPitch = 0.0f;
 float targetYaw = 0.0f;
 float targetPitch = 0.0f;
 float turnSpeed = 3.0f;
+
+// Animation 
+static bool playAnimation = true;
+static float playbackSpeed = 2.0f;
 
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
@@ -553,9 +556,13 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
+	// Our 3D character
+	MyBot bot;
+	bot.initialize(lightPosition, lightIntensity);
+
     // Create the classical Cornell Box
-	CornellBox b;
-	b.initialize();
+	CornellBox box;
+	box.initialize();
 
 	// Camera setup
     glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
@@ -576,6 +583,11 @@ int main(void)
 		double currentTime = glfwGetTime();
 		float deltaTime = float(currentTime - lastTime);
 		lastTime = currentTime;
+
+		if (playAnimation) {
+			time += deltaTime * playbackSpeed;
+			bot.update(time);
+		}
 
 		// Update turning status
 		if (isTurning) {
@@ -608,7 +620,8 @@ int main(void)
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		// Render the scene using the shadow map
-		b.render(vp, lightSpaceMatrix);
+		box.render(vp, lightSpaceMatrix);
+		bot.render(vp);
 		sky.render(vp);
 
 		// FPS tracking 
@@ -621,7 +634,7 @@ int main(void)
 			fTime = 0;
 
 			std::stringstream stream;
-			stream << std::fixed << std::setprecision(2) << "Lab 4 | Frames per second (FPS): " << fps;
+			stream << std::fixed << std::setprecision(2) << "Frames per second (FPS): " << fps;
 			glfwSetWindowTitle(window, stream.str().c_str());
 		}
 
@@ -633,7 +646,9 @@ int main(void)
 	while (!glfwWindowShouldClose(window));
 
 	// Clean up
-	b.cleanup();
+	box.cleanup();
+	sky.cleanup();
+	bot.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
