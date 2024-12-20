@@ -3,6 +3,7 @@
 #include <camera.cpp>
 #include <skybox.cpp>
 #include <bot.cpp>
+#include <lamp.cpp>
 #include <geometry.cpp>
 #include <lighting.cpp>
 
@@ -560,6 +561,10 @@ int main(void)
 	MyBot bot;
 	bot.initialize(lightPosition, lightIntensity);
 
+	// A Street Lamp
+	Lamp lamp;
+	lamp.initialize(lightPosition, lightIntensity);
+
     // Create the classical Cornell Box
 	CornellBox box;
 	box.initialize();
@@ -622,6 +627,7 @@ int main(void)
 		// Render the scene using the shadow map
 		box.render(vp, lightSpaceMatrix);
 		bot.render(vp);
+		lamp.render(vp);
 		sky.render(vp);
 
 		// FPS tracking 
@@ -649,6 +655,7 @@ int main(void)
 	box.cleanup();
 	sky.cleanup();
 	bot.cleanup();
+	lamp.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
