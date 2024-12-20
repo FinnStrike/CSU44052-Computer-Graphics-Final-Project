@@ -38,7 +38,6 @@ public:
 
         // Record number of indices
         indexCount = (int)(indicesSize/sizeof(GLuint));
-        std::cerr << std::to_string(indexCount) << std::endl;
 
         // Color buffer
         glGenBuffers(1, &colorBufferID);

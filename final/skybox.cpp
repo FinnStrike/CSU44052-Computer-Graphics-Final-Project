@@ -194,10 +194,6 @@ struct Skybox {
 		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 
 		// Load a random texture into the GPU memory
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> distr(0, 5);
-		int randomInt = distr(gen);
 		textureID = LoadTextureTileBox("../final/sky.png");
 
 		// Get a handle for our "textureSampler" uniform
@@ -253,7 +249,7 @@ struct Skybox {
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
-		//glDisableVertexAttribArray(2);
+		glDisableVertexAttribArray(2);
 	}
 
 	void cleanup() {
@@ -261,8 +257,8 @@ struct Skybox {
 		glDeleteBuffers(1, &colorBufferID);
 		glDeleteBuffers(1, &indexBufferID);
 		glDeleteVertexArrays(1, &vertexArrayID);
-		//glDeleteBuffers(1, &uvBufferID);
-		//glDeleteTextures(1, &textureID);
+		glDeleteBuffers(1, &uvBufferID);
+		glDeleteTextures(1, &textureID);
 		glDeleteProgram(programID);
 	}
 };

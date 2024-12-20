@@ -40,32 +40,6 @@ static float depthFoV = 120.0f;
 static float depthNear = 10.0f;
 static float depthFar = 2000.0f;
 
-// Helper flag and function to save depth maps for debugging
-static bool saveDepth = false;
-
-// This function retrieves and stores the depth map of the default frame buffer 
-// or a particular frame buffer (indicated by FBO ID) to a PNG image.
-static void saveDepthTexture(GLuint fbo, std::string filename) {
-    int width = shadowMapWidth;
-    int height = shadowMapHeight;
-	if (shadowMapWidth == 0 || shadowMapHeight == 0) {
-		width = windowWidth;
-		height = windowHeight;
-	}
-    int channels = 3; 
-    
-    std::vector<float> depth(width * height);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glReadBuffer(GL_DEPTH_COMPONENT);
-    glReadPixels(0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    std::vector<unsigned char> img(width * height * 3);
-    for (int i = 0; i < width * height; ++i) img[3*i] = img[3*i+1] = img[3*i+2] = depth[i] * 255;
-
-    stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
-}
-
 bool isTurning = false;
 float currentYaw = 0.0f;
 float currentPitch = 0.0f;
@@ -488,29 +462,8 @@ struct CornellBox {
 		0.0f, 0.0f,
 	};
 
-	// OpenGL buffers
-	GLuint vertexArrayID;
-	GLuint vertexBufferID;
-	GLuint indexBufferID;
-	GLuint colorBufferID;
-	GLuint normalBufferID;
-	GLuint uvBufferID;
-	GLuint textureID;
-
-	// Shader variable IDs
-	GLuint mvpMatrixID;
-	GLuint textureSamplerID;
-	GLuint lightPositionID;
-	GLuint lightIntensityID;
-	GLuint lightSpaceMatrixID;
-	GLuint exposureID;
 	GLuint programID;
-
-	// Depth shader IDs
 	GLuint depthProgramID;
-	GLuint depthMatrixID;
-	GLuint shadowFBO;
-	GLuint shadowTexture;
 
 	Geometry geometry;
 	Lighting lighting;
@@ -672,13 +625,6 @@ int main(void)
 			glfwSetWindowTitle(window, stream.str().c_str());
 		}
 
-		if (saveDepth) {
-            std::string filename = "depth_camera.png";
-            saveDepthTexture(b.shadowFBO, filename);
-            std::cout << "Depth texture saved to " << filename << std::endl;
-            saveDepth = false;
-        }
-
 		// Swap buffers
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -750,11 +696,6 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			isTurning = true;
 		}
 	}
-	    
-	if (key == GLFW_KEY_SPACE && (action == GLFW_REPEAT || action == GLFW_PRESS)) 
-    {
-        saveDepth = true;
-    }
 
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
