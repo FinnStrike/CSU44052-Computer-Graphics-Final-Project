@@ -562,8 +562,8 @@ int main(void)
 	bot.initialize(lightPosition, lightIntensity);
 
 	// A Street Lamp
-	Lamp lamp;
-	lamp.initialize(lightPosition, lightIntensity);
+	StaticModel lamp;
+	lamp.initialize(/* lightPosition, lightIntensity, "../final/model/lamp/street_lamp_01_1k.gltf" */);
 
     // Create the classical Cornell Box
 	CornellBox box;
@@ -625,7 +625,7 @@ int main(void)
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		// Render the scene using the shadow map
-		box.render(vp, lightSpaceMatrix);
+		//box.render(vp, lightSpaceMatrix);
 		bot.render(vp);
 		lamp.render(vp);
 		sky.render(vp);
@@ -655,7 +655,6 @@ int main(void)
 	box.cleanup();
 	sky.cleanup();
 	bot.cleanup();
-	lamp.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();

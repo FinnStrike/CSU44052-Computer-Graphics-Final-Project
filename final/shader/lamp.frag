@@ -1,18 +1,18 @@
 #version 330 core
 
-in vec3 color;
-
-// Receive UV input to this fragment shader
+in vec3 worldPosition;
+in vec3 worldNormal;
 //in vec2 uv;
 
-// Access the texture sampler
 //uniform sampler2D textureSampler;
 
-out vec3 finalColor;
+out vec4 finalColor;
 
 void main()
 {
-	// Perform texture lookup.
-	//finalColor = texture(textureSampler, uv).rgb;
-	finalColor = vec3(255, 0, 0);
+    // TODO: fix
+    finalColor = vec4(gl_FragCoord.z, 0.5, 0.5, 1.0);
+
+    //finalColor = texture(textureSampler, uv);
+
 }
