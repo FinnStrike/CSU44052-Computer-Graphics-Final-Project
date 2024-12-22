@@ -31,8 +31,8 @@ static float exposure = 2.0f;
 
 // Shadow mapping
 static glm::vec3 lightUp(0, 0, 1);
-static int shadowMapWidth = 2048;
-static int shadowMapHeight = 2048;
+static int shadowMapWidth = 1024;
+static int shadowMapHeight = 1024;
 
 // DONE: set these parameters 
 static float depthFoV = 120.0f;
@@ -761,7 +761,7 @@ static void cursor_callback(GLFWwindow *window, double xpos, double ypos) {
 	x = x * 2.0f - 1.0f;
 	y = 1.0f - y * 2.0f;
 
-	const float scale = 250.0f;
+	const float scale = 800.0f;
 	lightPosition.x = x * scale - 278;
 	lightPosition.y = y * scale + 278;
 

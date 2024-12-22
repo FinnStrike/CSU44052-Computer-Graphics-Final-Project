@@ -52,7 +52,7 @@ void main()
         float closestDepth = texture(shadowMap, lightCoords.xy).r;
 
         // Create a dynamic bias to prevent shadow acne
-        float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
+        float bias = 0; //max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
     
         // Check if the fragment is in shadow
         shadow = (lightCoords.z >= closestDepth + bias) ? 0.2 : 1.0;
