@@ -1,16 +1,5 @@
-#include <tiny_gltf.h>
 #include <render/texture.h>
 #include <render/shader.h>
-#include <vector>
-#include <iostream>
-#include <glad/gl.h>
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/string_cast.hpp>
-#include <iomanip>
-#include <math.h>
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -20,10 +9,13 @@ struct StaticModel {
     GLuint jointMatricesID;
     GLuint lightPositionID;
     GLuint lightIntensityID;
+    GLuint exposureID;
     GLuint programID;
+    GLuint textureSamplerID;
 
     glm::vec3 lightIntensity;
     glm::vec3 lightPosition;
+    float exposure;
 
     tinygltf::Model model;
 
@@ -33,6 +25,7 @@ struct StaticModel {
         std::map<int, GLuint> vbos;
         int indexCount;
         GLenum indexType;
+        GLuint textureID;
     };
     std::vector<PrimitiveObject> primitiveObjects;
 
@@ -93,11 +86,47 @@ struct StaticModel {
         return res;
     }
 
-    void initialize() {
+    std::vector<GLuint> loadTextures(const tinygltf::Model& model) {
+        std::vector<GLuint> textureIDs(model.textures.size(), 0);
+
+        for (size_t i = 0; i < model.textures.size(); ++i) {
+            const tinygltf::Texture& texture = model.textures[i];
+            const tinygltf::Image& image = model.images[texture.source];
+
+            GLuint texID;
+            glGenTextures(1, &texID);
+            glBindTexture(GL_TEXTURE_2D, texID);
+
+            // Upload texture data to OpenGL
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, image.image.data());
+
+            // Set texture parameters
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+            textureIDs[i] = texID;
+            glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+        }
+
+        return textureIDs;
+    }
+
+
+    void initialize(glm::vec3 lightPosition, glm::vec3 lightIntensity, float exposure, const char * filepath) {
         // Modify your path if needed
-        if (!loadModel(model, "../final/model/tree/tree_small_02_1k.gltf")) {
+        if (!loadModel(model, filepath /*"../final/model/tree/tree_small_02_1k.gltf"*/)) {
             return;
         }
+
+        // Add light Position and Intensity
+        this->lightPosition = lightPosition;
+        this->lightIntensity = lightIntensity;
+        this->exposure = exposure;
 
         // Prepare buffers for rendering
         primitiveObjects = bindModel(model);
@@ -112,6 +141,8 @@ struct StaticModel {
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
         lightPositionID = glGetUniformLocation(programID, "lightPosition");
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
+        exposureID = glGetUniformLocation(programID, "exposure");
+        textureSamplerID = glGetUniformLocation(programID, "textureSampler");
     }
 
     void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
@@ -150,7 +181,7 @@ struct StaticModel {
                 int vaa = -1;
                 if (attrib.first == "POSITION") vaa = 0;
                 if (attrib.first == "NORMAL") vaa = 1;
-                //if (attrib.first == "TEXCOORD_0") vaa = 2; todo
+                if (attrib.first == "TEXCOORD_0") vaa = 2;
 
                 if (vaa > -1) {
                     glEnableVertexAttribArray(vaa);
@@ -177,7 +208,7 @@ struct StaticModel {
         std::vector<PrimitiveObject> primitives;
 
         // Load all textures
-        //auto textureIDs = loadTextures(model);
+        std::vector<GLuint> textureIDs = loadTextures(model);
 
         // Create VBOs for all buffer views
         std::map<int, GLuint> bufferViewVBOs;
@@ -246,15 +277,17 @@ struct StaticModel {
                     primitiveObject.indexType = indexAccessor.componentType;
                 }
 
-                /*
                 // Bind texture to the primitive
                 if (primitive.material >= 0) {
-                    const tinygltf::Material &material = model.materials[primitive.material];
+                    const tinygltf::Material& material = model.materials[primitive.material];
                     if (material.pbrMetallicRoughness.baseColorTexture.index >= 0) {
                         primitiveObject.textureID = textureIDs[material.pbrMetallicRoughness.baseColorTexture.index];
                     }
                 }
-                */
+                else {
+                    primitiveObject.textureID = 0;
+                }
+
                 glBindVertexArray(0);
                 primitives.push_back(primitiveObject);
             }
@@ -262,26 +295,40 @@ struct StaticModel {
         return primitives;
     }
 
-    void render(const glm::mat4& cameraMatrix/*, const glm::vec3& lightPosition, const glm::vec3& lightIntensity*/) {
+    void render(const glm::mat4& cameraMatrix) {
         glUseProgram(programID);
 
-        glm::mat4 mvpMatrix = cameraMatrix;
+        // Scale and translate the model
+        glm::mat4 modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, glm::vec3(-275.0f, 100.0f, 0.0f));
+        modelMatrix = glm::scale(modelMatrix, glm::vec3(100.0f, 100.0f, 100.0f));
+
+        // Combine transformations with the camera matrix
+        glm::mat4 mvpMatrix = cameraMatrix * modelMatrix;
+
+        // Pass the updated MVP matrix to the shader
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
-        /*
+
+        // Set light data 
         glUniform3fv(lightPositionID, 1, &lightPosition[0]);
         glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-         */
+        glUniform1f(exposureID, exposure);
 
+        // Render each primitive
         for (const auto& primitive : primitiveObjects) {
             glBindVertexArray(primitive.vao);
+            if (primitive.textureID) {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, primitive.textureID);
+                glUniform1i(textureSamplerID, 0);
+            }
             glDrawElements(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0);
-            //glBindVertexArray(0);
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
+        // Reset state
         glUseProgram(0);
         glBindVertexArray(0);
-        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        //glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     
 };

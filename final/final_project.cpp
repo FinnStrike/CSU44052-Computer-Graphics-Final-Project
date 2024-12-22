@@ -563,7 +563,7 @@ int main(void)
 
 	// A Street Lamp
 	StaticModel lamp;
-	lamp.initialize(/* lightPosition, lightIntensity, "../final/model/lamp/street_lamp_01_1k.gltf" */);
+	lamp.initialize(lightPosition, lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf");
 
     // Create the classical Cornell Box
 	CornellBox box;
@@ -626,7 +626,7 @@ int main(void)
 
 		// Render the scene using the shadow map
 		//box.render(vp, lightSpaceMatrix);
-		bot.render(vp);
+		//bot.render(vp);
 		lamp.render(vp);
 		sky.render(vp);
 
