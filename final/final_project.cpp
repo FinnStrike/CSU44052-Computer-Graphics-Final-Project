@@ -3,8 +3,6 @@
 #include <camera.cpp>
 #include <skybox.cpp>
 #include <bot.cpp>
-#include <lamp.cpp>
-#include <ground.cpp>
 #include <geometry.cpp>
 #include <lighting.cpp>
 
@@ -28,13 +26,13 @@ const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
 const glm::vec3 wave600(255.0f, 190.0f, 0.0f);
 const glm::vec3 wave700(205.0f, 0.0f, 0.0f);
 static glm::vec3 lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-static glm::vec3 lightPosition(-275.0f, 500.0f, -275.0f);
+static glm::vec3 lightPosition(-275.0f, 800.0f, -275.0f);
 static float exposure = 2.0f;
 
 // Shadow mapping
 static glm::vec3 lightUp(0, 0, 1);
-static int shadowMapWidth = 1024;
-static int shadowMapHeight = 1024;
+static int shadowMapWidth = 2048;
+static int shadowMapHeight = 2048;
 
 // DONE: set these parameters 
 static float depthFoV = 120.0f;
@@ -480,16 +478,12 @@ struct CornellBox {
 			std::cerr << "Failed to load box shaders." << std::endl;
 		}
 
-		depthProgramID = LoadShadersFromFile("../final/shader/depth.vert", "../final/shader/depth.frag");
-		if (depthProgramID == 0) {
-			std::cerr << "Failed to load depth shaders." << std::endl;
-		}
-
 		// Initialize Geometry and Lighting
 		geometry.initialize(programID, vertex_buffer_data, index_buffer_data, color_buffer_data, normal_buffer_data, uv_buffer_data,
 							sizeof(vertex_buffer_data), sizeof(index_buffer_data), sizeof(color_buffer_data), sizeof(normal_buffer_data), sizeof(uv_buffer_data),
 							"../final/assets/facade4.jpg");
-		lighting.initialize(programID, depthProgramID, shadowMapWidth, shadowMapHeight);
+		lighting.initialize(programID, shadowMapWidth, shadowMapHeight);
+		depthProgramID = lighting.depthProgramID;
 	}
 
 	void render(glm::mat4 cameraMatrix, glm::mat4 lightSpaceMatrix) {
@@ -568,14 +562,25 @@ int main(void)
 
 	// A Street Lamp
 	StaticModel lamp;
-	lamp.initialize(glm::vec3(0.0f, 1000.0f, 500.0f), lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf");
+	lamp.initialize(lightPosition, lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf",
+		glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(100.0f, 100.0f, 100.0f), ground.programID);
 
     // Create the classical Cornell Box
-	CornellBox box;
-	box.initialize();
+	//CornellBox box;
+	//box.initialize();
+
+	Lighting sceneLight;
+	sceneLight.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
+	sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
+
+	std::vector<StaticModel> models;
+	models.push_back(lamp);
+
+	std::vector<Plane> planes;
+	planes.push_back(ground);
 
 	// Camera setup
-    glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
+	glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
 	lightProjection = glm::perspective(glm::radians(depthFoV), (float)shadowMapWidth / shadowMapHeight, depthNear, depthFar);
 
@@ -596,7 +601,7 @@ int main(void)
 
 		if (playAnimation) {
 			time += deltaTime * playbackSpeed;
-			bot.update(time);
+			//bot.update(time);
 		}
 
 		// Update turning status
@@ -632,8 +637,15 @@ int main(void)
 		// Render the scene using the shadow map
 		//box.render(vp, lightSpaceMatrix);
 		//bot.render(vp);
-		lamp.render(vp);
+
+		sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
+		sceneLight.performShadowPass(lightSpaceMatrix, models, planes);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		sceneLight.prepareLighting();
 		ground.render(vp);
+		sceneLight.prepareLighting();
+		lamp.render(vp);
+
 		sky.render(vp);
 
 		// FPS tracking 
@@ -658,7 +670,7 @@ int main(void)
 	while (!glfwWindowShouldClose(window));
 
 	// Clean up
-	box.cleanup();
+	//box.cleanup();
 	sky.cleanup();
 	bot.cleanup();
 	ground.cleanup();

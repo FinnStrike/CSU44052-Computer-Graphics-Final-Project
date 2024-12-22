@@ -6,11 +6,20 @@ struct Plane {
 	glm::vec3 position;
 	glm::vec3 scale;
 
+	glm::mat4 modelMatrix;
+
 	GLfloat vertex_buffer_data[12] = {
 		-0.5f, 0.0f, -0.5f, // bottom-left
 		 0.5f, 0.0f, -0.5f, // bottom-right
 		 0.5f, 0.0f,  0.5f, // top-right
 		-0.5f, 0.0f,  0.5f  // top-left
+	};
+
+	GLfloat normal_buffer_data[12] = {
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f
 	};
 
 	GLuint index_buffer_data[6] = {
@@ -29,9 +38,10 @@ struct Plane {
 	GLuint vertexArrayID;
 	GLuint vertexBufferID;
 	GLuint indexBufferID;
-	GLuint colorBufferID;
+	GLuint normalBufferID;
 	GLuint uvBufferID;
 	GLuint textureID;
+	GLuint modelMatrixID;
 
 	// Shader variable IDs
 	GLuint mvpMatrixID;
@@ -43,6 +53,13 @@ struct Plane {
 		this->position = position;
 		this->scale = scale;
 
+		// Model transform
+		modelMatrix = glm::mat4(1.0f);
+		modelMatrix = glm::translate(modelMatrix, position);
+		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, scale.y / 2.0f, 0.0f));
+		modelMatrix = glm::scale(modelMatrix, scale);
+		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.5f, 0.0f));
+
 		// Create a vertex array object
 		glGenVertexArrays(1, &vertexArrayID);
 		glBindVertexArray(vertexArrayID);
@@ -51,6 +68,11 @@ struct Plane {
 		glGenBuffers(1, &vertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data), vertex_buffer_data, GL_STATIC_DRAW);
+
+		// Create a vertex buffer object to store the normal data		
+		glGenBuffers(1, &normalBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
 
 		// Create a vertex buffer object to store the UV data
 		glGenBuffers(1, &uvBufferID);
@@ -63,7 +85,7 @@ struct Plane {
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
 		// Create and compile our GLSL program from the shaders
-		programID = LoadShadersFromFile("../final/shader/sky.vert", "../final/shader/sky.frag");
+		programID = LoadShadersFromFile("../final/shader/model.vert", "../final/shader/model.frag");
 		if (programID == 0)
 		{
 			std::cerr << "Failed to load shaders." << std::endl;
@@ -72,15 +94,14 @@ struct Plane {
 		// Get a handle for our "MVP" uniform
 		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 
+		// Get a handle for our Model Matrix uniform
+		modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
+
 		// Load a random texture into the GPU memory
 		textureID = LoadTextureTileBox("../final/assets/ground.jpg");
 
 		// Get a handle for our "textureSampler" uniform
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
-	}
-
-	void updatePosition(glm::vec3 position) {
-		this->position = position;
 	}
 
 	void render(glm::mat4 cameraMatrix) {
@@ -92,19 +113,16 @@ struct Plane {
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, normalBufferID);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// Model transform
-		glm::mat4 modelMatrix = glm::mat4(1.0f);
-		modelMatrix = glm::translate(modelMatrix, position);
-		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, scale.y / 2.0f, 0.0f));
-		// Scale the box along each axis
-		modelMatrix = glm::scale(modelMatrix, scale);
-		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.5f, 0.0f));
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
 		// Set model-view-projection matrix
 		glm::mat4 mvp = cameraMatrix * modelMatrix;
 		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
+		glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
 		// Enable UV buffer and texture sampler
 		glEnableVertexAttribArray(2);
@@ -129,9 +147,30 @@ struct Plane {
 		glDisableVertexAttribArray(2);
 	}
 
+	void renderDepth(GLuint programID, GLuint mvpMatrixID, const glm::mat4& lightSpaceMatrix) {
+		glUseProgram(programID);
+
+		// Combine transformations with the camera matrix
+		glm::mat4 mvpMatrix = lightSpaceMatrix * modelMatrix;
+
+		// Pass the updated MVP matrix to the shader
+		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
+
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
+		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0);
+		glDisableVertexAttribArray(0);
+
+		// Reset state
+		glBindVertexArray(0);
+		glUseProgram(0);
+	}
+
 	void cleanup() {
 		glDeleteBuffers(1, &vertexBufferID);
-		glDeleteBuffers(1, &colorBufferID);
+		glDeleteBuffers(1, &normalBufferID);
 		glDeleteBuffers(1, &indexBufferID);
 		glDeleteVertexArrays(1, &vertexArrayID);
 		glDeleteBuffers(1, &uvBufferID);

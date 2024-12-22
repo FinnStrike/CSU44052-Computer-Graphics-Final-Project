@@ -1,4 +1,7 @@
-#include <render/headers.h>
+#include <render/shader.h>
+#include <render/texture.h>
+#include <model.cpp>
+#include <ground.cpp>
 
 class Lighting {
 public:
@@ -19,10 +22,16 @@ public:
 
     GLuint programID, depthProgramID;
 
-    void initialize(GLuint programID, GLuint depthProgramID, int shadowMapWidth, int shadowMapHeight) {
+    bool saveDepth = true;
+
+    void initialize(GLuint programID, int shadowMapWidth, int shadowMapHeight) {
         // Set program IDs
         this->programID = programID;
-        this->depthProgramID = depthProgramID;
+
+        depthProgramID = LoadShadersFromFile("../final/shader/depth.vert", "../final/shader/depth.frag");
+        if (depthProgramID == 0) {
+            std::cerr << "Failed to load depth shaders." << std::endl;
+        }
 
         // Initialize light and shadow uniform locations
         lightPositionID = glGetUniformLocation(programID, "lightPosition");
@@ -89,9 +98,27 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    void performShadowPass(glm::mat4 lightSpaceMatrix, std::vector<StaticModel> models, std::vector<Plane> planes) {
+        // Record Light Space Matrix
+        this->lightSpaceMatrix = lightSpaceMatrix;
+
+        // Perform Shadow pass
+        glUseProgram(depthProgramID);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        for (auto& model : models) model.renderDepth(depthProgramID, depthMatrixID, lightSpaceMatrix);
+        for (auto& plane : planes) plane.renderDepth(depthProgramID, depthMatrixID, lightSpaceMatrix);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glUseProgram(0);
+
+        if (saveDepth) saveDepthTexture(shadowFBO, "depth.png");
+        saveDepth = false;
+    }
+
     void prepareLighting() {
         glUseProgram(programID);
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
         GLuint shadowMapID = glGetUniformLocation(programID, "shadowMap");
         glActiveTexture(GL_TEXTURE1);
@@ -107,5 +134,22 @@ public:
     void cleanup() {
         glDeleteTextures(1, &shadowTexture);
         glDeleteFramebuffers(1, &shadowFBO);
+    }
+
+    void saveDepthTexture(GLuint fbo, std::string filename) {
+        int width = shadowMapWidth;
+        int height = shadowMapHeight;
+        int channels = 3;
+
+        std::vector<float> depth(width * height);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glReadBuffer(GL_DEPTH_COMPONENT);
+        glReadPixels(0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        std::vector<unsigned char> img(width * height * 3);
+        for (int i = 0; i < width * height; ++i) img[3 * i] = img[3 * i + 1] = img[3 * i + 2] = depth[i] * 255;
+
+        stbi_write_png(filename.c_str(), width, height, channels, img.data(), width * channels);
     }
 };

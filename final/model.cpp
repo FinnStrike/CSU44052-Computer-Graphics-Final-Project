@@ -12,10 +12,13 @@ struct StaticModel {
     GLuint exposureID;
     GLuint programID;
     GLuint textureSamplerID;
+    GLuint modelMatrixID;
 
     glm::vec3 lightIntensity;
     glm::vec3 lightPosition;
     float exposure;
+
+    glm::mat4 modelMatrix;
 
     tinygltf::Model model;
 
@@ -117,11 +120,17 @@ struct StaticModel {
     }
 
 
-    void initialize(glm::vec3 lightPosition, glm::vec3 lightIntensity, float exposure, const char * filepath) {
+    void initialize(glm::vec3 lightPosition, glm::vec3 lightIntensity, float exposure, const char * filepath, 
+                    glm::vec3 translation, glm::vec3 scale, GLuint programID) {
         // Modify your path if needed
         if (!loadModel(model, filepath /*"../final/model/tree/tree_small_02_1k.gltf"*/)) {
             return;
         }
+
+        // Scale and translate the model
+        modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, translation);
+        modelMatrix = glm::scale(modelMatrix, scale);
 
         // Add light Position and Intensity
         this->lightPosition = lightPosition;
@@ -131,14 +140,12 @@ struct StaticModel {
         // Prepare buffers for rendering
         primitiveObjects = bindModel(model);
 
-        // Create and compile our GLSL program from the shaders todo
-        programID = LoadShadersFromFile("../final/shader/lamp.vert", "../final/shader/lamp.frag");
-        if (programID == 0) {
-            std::cerr << "Failed to load shaders." << std::endl;
-        }
+        // Create and compile our GLSL program from the shaders
+        this->programID = programID;
 
         // Get a handle for GLSL variables
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
+        modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
         lightPositionID = glGetUniformLocation(programID, "lightPosition");
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
         exposureID = glGetUniformLocation(programID, "exposure");
@@ -298,16 +305,12 @@ struct StaticModel {
     void render(const glm::mat4& cameraMatrix) {
         glUseProgram(programID);
 
-        // Scale and translate the model
-        glm::mat4 modelMatrix = glm::mat4(1.0f);
-        modelMatrix = glm::translate(modelMatrix, glm::vec3(-275.0f, 100.0f, 0.0f));
-        modelMatrix = glm::scale(modelMatrix, glm::vec3(100.0f, 100.0f, 100.0f));
-
         // Combine transformations with the camera matrix
         glm::mat4 mvpMatrix = cameraMatrix * modelMatrix;
 
         // Pass the updated MVP matrix to the shader
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
+        glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
         // Set light data 
         glUniform3fv(lightPositionID, 1, &lightPosition[0]);
@@ -330,6 +333,25 @@ struct StaticModel {
         glUseProgram(0);
         glBindVertexArray(0);
     }
-    
+
+    void renderDepth(GLuint programID, GLuint mvpMatrixID, const glm::mat4& lightSpaceMatrix) {
+        glUseProgram(programID);
+
+        // Combine transformations with the camera matrix
+        glm::mat4 mvpMatrix = lightSpaceMatrix * modelMatrix;
+
+        // Pass the updated MVP matrix to the shader
+        glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
+
+        // Render each primitive
+        for (const auto& primitive : primitiveObjects) {
+            glBindVertexArray(primitive.vao);
+            glDrawElements(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0);
+        }
+
+        // Reset state
+        glBindVertexArray(0);
+        glUseProgram(0);
+    }
 };
 
