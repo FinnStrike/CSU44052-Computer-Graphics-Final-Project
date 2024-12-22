@@ -4,6 +4,7 @@
 #include <skybox.cpp>
 #include <bot.cpp>
 #include <lamp.cpp>
+#include <ground.cpp>
 #include <geometry.cpp>
 #include <lighting.cpp>
 
@@ -19,7 +20,7 @@ static glm::vec3 eye_center(-278.0f, 273.0f, 800.0f);
 static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 static float FoV = 45.0f;
-static float zNear = 100.0f;
+static float zNear = 10.0f;
 static float zFar = 10000.0f;
 
 // Lighting control 
@@ -557,13 +558,17 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
+	// Create the ground
+	Plane ground;
+	ground.initialize(glm::vec3(-275.0f, -400.0f, 0.0f), glm::vec3(1024, 500, 1024));
+
 	// Our 3D character
 	MyBot bot;
 	bot.initialize(lightPosition, lightIntensity);
 
 	// A Street Lamp
 	StaticModel lamp;
-	lamp.initialize(lightPosition, lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf");
+	lamp.initialize(glm::vec3(0.0f, 1000.0f, 500.0f), lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf");
 
     // Create the classical Cornell Box
 	CornellBox box;
@@ -628,6 +633,7 @@ int main(void)
 		//box.render(vp, lightSpaceMatrix);
 		//bot.render(vp);
 		lamp.render(vp);
+		ground.render(vp);
 		sky.render(vp);
 
 		// FPS tracking 
@@ -655,6 +661,7 @@ int main(void)
 	box.cleanup();
 	sky.cleanup();
 	bot.cleanup();
+	ground.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
