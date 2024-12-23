@@ -105,26 +105,41 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
+	std::vector<glm::mat4> gts;
+	glm::mat4 gt(1.0f);
+	gt = glm::translate(gt, glm::vec3(-275.0f, 100.0f, 0.0f));
+	gt = glm::scale(gt, glm::vec3(1024, 0, 1024));
+	gts.push_back(gt);
+
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			glm::mat4 g(1.0f);
+			g = glm::translate(g, glm::vec3((j * 1024.0f) - 275.0f, 100.0f, 0.0f + (i * 1024.0f)));
+			g = glm::scale(g, glm::vec3(1024, 0, 1024));
+			gts.push_back(g);
+		}
+	}
+
 	// Create the ground
 	Plane ground;
-	ground.initialize(glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(1024, 0, 1024));
+	ground.initialize(gts);
 
 	// Our 3D character
-	MyBot bot;
-	bot.initialize(lightPosition, lightIntensity);
+	//MyBot bot;
+	//bot.initialize(lightPosition, lightIntensity);
 
 	// A Street Lamp
 	StaticModel lamp;
-	lamp.initialize(ground.programID, glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(100.0f, 100.0f, 100.0f), 
-		"../final/model/lamp/street_lamp_01_1k.gltf");
+	//lamp.initialize(ground.programID, glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(100.0f, 100.0f, 100.0f), 
+	//	"../final/model/lamp/street_lamp_01_1k.gltf");
 
 	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-275.0f, 427.5f, 0.0f));
 	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 	// A Folding Stool
 	StaticModel stool;
-	stool.initialize(ground.programID, glm::vec3(-125.0f, 100.0f, 100.0f), glm::vec3(100.0f, 100.0f, 80.0f),
-		"../final/model/stool/folding_wooden_stool_1k.gltf");
+	//stool.initialize(ground.programID, glm::vec3(-125.0f, 100.0f, 100.0f), glm::vec3(100.0f, 100.0f, 80.0f),
+	//	"../final/model/stool/folding_wooden_stool_1k.gltf");
 
 	Lighting sceneLight;
 	sceneLight.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
@@ -132,7 +147,7 @@ int main(void)
 
 	std::vector<StaticModel> models;
 	//models.push_back(lamp);
-	models.push_back(stool);
+	//models.push_back(stool);
 
 	std::vector<Plane> planes;
 	planes.push_back(ground);
@@ -195,8 +210,8 @@ int main(void)
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		sceneLight.prepareLighting();
 		ground.render(vp);
-		stool.render(vp);
-		lamp.render(vp);
+		//stool.render(vp);
+		//lamp.render(vp);
 
 		sky.render(vp);
 
@@ -223,7 +238,7 @@ int main(void)
 
 	// Clean up
 	sky.cleanup();
-	bot.cleanup();
+	//bot.cleanup();
 	ground.cleanup();
 
 	// Close OpenGL window and terminate GLFW

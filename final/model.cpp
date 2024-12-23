@@ -6,7 +6,6 @@
 struct StaticModel {
     // Shader variable IDs
     GLuint cameraMatrixID;
-    GLuint transformMatrixID;
     GLuint jointMatricesID;
     GLuint programID;
     GLuint textureSamplerID;
@@ -136,7 +135,6 @@ struct StaticModel {
 
         // Get a handle for GLSL variables
         cameraMatrixID = glGetUniformLocation(programID, "camera");
-        transformMatrixID = glGetUniformLocation(programID, "transform");
         modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
         baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
@@ -320,8 +318,6 @@ struct StaticModel {
 
         // Pass in model-view-projection matrix
         glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
-        glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
-        glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
         // Separate opaque and transparent objects
         std::vector<const PrimitiveObject*> opaqueObjects;
@@ -381,12 +377,11 @@ struct StaticModel {
         glBindVertexArray(0);
     }
 
-    void renderDepth(GLuint programID, GLuint lightMatID, GLuint tranMatID, const glm::mat4& lightSpaceMatrix) {
+    void renderDepth(GLuint programID, GLuint lightMatID, const glm::mat4& lightSpaceMatrix) {
         glUseProgram(programID);
 
         // Pass the MVP matrix to the shader
         glUniformMatrix4fv(lightMatID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
-        glUniformMatrix4fv(tranMatID, 1, GL_FALSE, &modelMatrix[0][0]);
 
         // Render each primitive
         for (const auto& primitive : primitiveObjects) {

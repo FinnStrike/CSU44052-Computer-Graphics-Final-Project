@@ -1,12 +1,12 @@
 #version 330 core
 
 layout(location = 0) in vec3 inPosition;
+layout(location = 3) in mat4 instanceMatrix;
 
 uniform mat4 lightSpace;
-uniform mat4 transform;
 
 void main()
 {
     // Transform the vertex position to light space
-    gl_Position = lightSpace * transform * vec4(inPosition, 1.0);
+    gl_Position = lightSpace * instanceMatrix * vec4(inPosition, 1.0);
 }

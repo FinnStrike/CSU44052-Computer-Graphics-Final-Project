@@ -13,7 +13,6 @@ public:
     GLuint lightSpaceMatrixID;
     GLuint lightExposureID;
     GLuint lightSpaceID;
-    GLuint transformID;
     GLuint shadowFBO;
     GLuint shadowTexture;
 
@@ -40,7 +39,6 @@ public:
         lightExposureID = glGetUniformLocation(programID, "exposure");
         lightSpaceMatrixID = glGetUniformLocation(programID, "lightSpaceMatrix");
         lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
-        transformID = glGetUniformLocation(depthProgramID, "transform");
 
         // Record shadow map size
         this->shadowMapWidth = shadowMapWidth;
@@ -87,8 +85,8 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, transformID, lightSpaceMatrix);
-        for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, transformID, lightSpaceMatrix);
+        for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, lightSpaceMatrix);
+        for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, lightSpaceMatrix);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glUseProgram(0);

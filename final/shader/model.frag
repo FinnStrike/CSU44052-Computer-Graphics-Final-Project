@@ -3,6 +3,7 @@
 in vec3 worldPosition;
 in vec3 worldNormal;
 in vec2 uv;
+in mat4 modelMatrix;
 
 uniform sampler2D textureSampler;
 uniform vec4 baseColorFactor;
@@ -17,7 +18,6 @@ uniform float exposure;
 // Shadow-related uniforms
 uniform sampler2D shadowMap;
 uniform mat4 lightSpaceMatrix;
-uniform mat4 modelMatrix;
 
 void main()
 {
