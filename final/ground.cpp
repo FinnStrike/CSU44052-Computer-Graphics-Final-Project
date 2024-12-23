@@ -58,9 +58,7 @@ struct Plane {
 		// Model transform
 		modelMatrix = glm::mat4(1.0f);
 		modelMatrix = glm::translate(modelMatrix, position);
-		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, scale.y / 2.0f, 0.0f));
 		modelMatrix = glm::scale(modelMatrix, scale);
-		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.5f, 0.0f));
 
 		// Create a vertex array object
 		glGenVertexArrays(1, &vertexArrayID);

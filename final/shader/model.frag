@@ -25,14 +25,27 @@ void main()
 	    // Normalize the world normal
         vec3 normal = normalize(worldNormal);
 
-        // Calculate the light direction and normalize it
-        vec3 lightDirection = normalize(lightPosition - worldPosition);
+        // Calculate the transformed light direction and normalize it
+        vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
+        vec3 lightDirection = normalize(lightPosition - fragPosition);
+
+        // Calculate the length of the light beam
+        float distance = length(lightPosition - fragPosition);
+
+        // Calculate the attenuation of the light
+        float attenuation = 1.0f;
+        float threshold = 300.0f;
+        if (distance > threshold) {
+            float k1 = 0.001f;
+            float k2 = 0.0002f;
+            attenuation = 1.0f / (1.0f + k1 * (distance - threshold) + k2 * pow(distance - threshold, 2));
+        }
 
         // Calculate diffuse shading using Lambertian reflectance
         float diff = max(dot(normal, lightDirection), 0.0);
 
         // Apply the light intensity
-        vec3 diffuse = diff * lightIntensity;
+        vec3 diffuse = diff * lightIntensity * attenuation;
     
         // Transform fragment position to light space
         vec4 fragPosLightSpace = lightSpaceMatrix * modelMatrix * vec4(worldPosition, 1.0);
