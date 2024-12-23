@@ -53,9 +53,17 @@ void main()
 
         // Create a dynamic bias to prevent shadow acne
         float bias = 0; //max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
-    
-        // Check if the fragment is in shadow
-        shadow = (lightCoords.z >= closestDepth + bias) ? 0.2 : 1.0;
+
+        // PCF for softer shadows
+        vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+        for(int x = -1; x <= 1; ++x) {
+            for(int y = -1; y <= 1; ++y) {
+                float pcfDepth = texture(shadowMap, lightCoords.xy + vec2(x, y) * texelSize).r;
+                // Check if the fragment is in shadow
+                shadow += lightCoords.z - bias >= pcfDepth ? 0.2 : 1.0;
+            }    
+        }
+        shadow /= 9.0;
     }
 
     // Apply the shadow factor to the diffuse color
