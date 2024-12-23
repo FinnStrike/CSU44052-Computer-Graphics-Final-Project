@@ -33,11 +33,13 @@ struct Camera {
         return glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
     }
 
-    // Method to update the position of the camera
-    void move(float delta) {
+    // Method to update the position of the camera based on a glm::vec3 delta
+    void move(const glm::vec3& delta) {
         glm::vec3 forward = glm::normalize(lookAt - position);
-        position += forward * delta;
-        lookAt += forward * delta;
+        glm::vec3 right = glm::normalize(glm::cross(forward, up));
+        glm::vec3 up = glm::normalize(glm::cross(right, forward));
+        position += forward * delta.z + right * delta.x + up * delta.y;
+        lookAt += forward * delta.z + right * delta.x + up * delta.y;
     }
 
     // Method to adjust the field of view (zooming in and out)
@@ -45,6 +47,11 @@ struct Camera {
         fov += deltaFoV;
         if (fov < 1.0f) fov = 1.0f;
         if (fov > 120.0f) fov = 120.0f;
+    }
+
+    // Method to update the lookAt target (camera setting)
+    void updateLookAt(glm::vec3 newFront) {
+        lookAt = position + newFront;
     }
 
     // Method to update the lookAt target (camera rotation)

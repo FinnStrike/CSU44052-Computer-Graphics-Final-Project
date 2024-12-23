@@ -39,12 +39,13 @@ static float depthFoV = 120.0f;
 static float depthNear = 10.0f;
 static float depthFar = 4000.0f;
 
-bool isTurning = false;
-float currentYaw = 0.0f;
-float currentPitch = 0.0f;
-float targetYaw = 0.0f;
-float targetPitch = 0.0f;
-float turnSpeed = 3.0f;
+// Mouse Movement
+static glm::vec2 lastMousePos(windowWidth / 2.0f, windowHeight / 2.0f);
+static float sensitivity = 0.1f;
+static double edgeThreshold = 50.0; // Pixels from the edge of the screen
+static float edgeTurnSpeed = 0.5f;  // Degrees per frame (adjust as needed)
+static float yaw = -90.0f;
+static float pitch = 0.0f;
 
 // Animation 
 static bool playAnimation = true;
@@ -52,454 +53,6 @@ static float playbackSpeed = 2.0f;
 
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
-
-struct CornellBox {
-
-	GLfloat vertex_buffer_data[180] = {
-	// Cornell Box
-		// Floor 
-		-552.8, 0.0, 0.0,   
-		0.0, 0.0,   0.0,
-		0.0, 0.0, -559.2,
-		-549.6, 0.0, -559.2,
-
-		// Ceiling
-		-556.0, 548.8, 0.0,   
-		-556.0, 548.8, -559.2,
-		0.0, 548.8, -559.2,
-		0.0, 548.8,   0.0,
-
-		// Left wall 
-		-552.8,   0.0,   0.0, 
-		-549.6,   0.0, -559.2,
-		-556.0, 548.8, -559.2,
-		-556.0, 548.8,   0.0,
-
-		// Right wall 
-		0.0,   0.0, -559.2,   
-		0.0,   0.0,   0.0,
-		0.0, 548.8,   0.0,
-		0.0, 548.8, -559.2,
-
-		// Back wall 
-		-549.6,   0.0, -559.2, 
-		0.0,   0.0, -559.2,
-		0.0, 548.8, -559.2,
-		-556.0, 548.8, -559.2,
-
-	// Short Box
-		// Top face
-		- 130.0, 165.0,  -65.0,
-		-82.0, 165.0, -225.0,
-		-240.0, 165.0, -272.0,
-		-290.0, 165.0, -114.0,
-
-		// Left face
-		-290.0,   0.0, -114.0,
-		-290.0, 165.0, -114.0,
-		-240.0, 165.0, -272.0,
-		-240.0,   0.0, -272.0,
-
-		// Front face
-		-130.0,   0.0,  -65.0,
-		-130.0, 165.0,  -65.0,
-		-290.0, 165.0, -114.0,
-		-290.0,   0.0, -114.0,
-
-		// Right face
-		-82.0,   0.0, -225.0,
-		-82.0, 165.0, -225.0,
-		-130.0, 165.0,  -65.0,
-		-130.0,   0.0,  -65.0,
-
-		// Back face
-		-240.0,   0.0, -272.0,
-		-240.0, 165.0, -272.0,
-		-82.0, 165.0, -225.0,
-		-82.0,   0.0, -225.0,
-
-	// Tall Box
-		// Top face
-		-423.0, 330.0, -247.0,
-		-265.0, 330.0, -296.0,
-		-314.0, 330.0, -456.0,
-		-472.0, 330.0, -406.0,
-
-		// Left face
-		-423.0,   0.0, -247.0,
-		-423.0, 330.0, -247.0,
-		-472.0, 330.0, -406.0,
-		-472.0,   0.0, -406.0,
-
-		// Front face
-		-472.0,   0.0, -406.0,
-		-472.0, 330.0, -406.0,
-		-314.0, 330.0, -456.0,
-		-314.0,   0.0, -456.0,
-
-		// Right face
-		-314.0,   0.0, -456.0,
-		-314.0, 330.0, -456.0,
-		-265.0, 330.0, -296.0,
-		-265.0,   0.0, -296.0,
-
-		// Back face
-		-265.0,   0.0, -296.0,
-		-265.0, 330.0, -296.0,
-		-423.0, 330.0, -247.0,
-		-423.0,   0.0, -247.0,
-	};
-
-	GLfloat normal_buffer_data[180] = {
-	// Cornell Box
-		// Floor 
-		0.0, 1.0, 0.0,   
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-
-		// Ceiling
-		0.0, -1.0, 0.0,   
-		0.0, -1.0, 0.0,
-		0.0, -1.0, 0.0,
-		0.0, -1.0, 0.0,
-
-		// Left wall 
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-
-		// Right wall 
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-		-1.0, 0.0, 0.0,
-
-		// Back wall 
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0,
-		0.0, 0.0, 1.0,
-
-	// Short Box
-		// Top face
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-
-		// Left face
-		-0.953,0,-0.302,
-		-0.953,0,-0.302,
-		-0.953,0,-0.302,
-		-0.953,0,-0.302,
-
-		// Front face
-		-0.293, 0.0, 0.956,
-		-0.293, 0.0, 0.956,
-		-0.293, 0.0, 0.956,
-		-0.293, 0.0, 0.956,
-
-		// Right face
-		0.958, 0.0, 0.287,
-		0.958, 0.0, 0.287,
-		0.958, 0.0, 0.287,
-		0.958, 0.0, 0.287,
-
-		// Back face
-		0.285, 0, -0.958,
-		0.285, 0, -0.958,
-		0.285, 0, -0.958,
-		0.285, 0, -0.958,
-
-	// Tall Box
-		// Top face
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-
-		// Left face
-		-0.956, 0, 0.295,
-		-0.956, 0, 0.295,
-		-0.956, 0, 0.295,
-		-0.956, 0, 0.295,
-
-		// Back face
-		-0.302, 0.0, -0.953,
-		-0.302, 0.0, -0.953,
-		-0.302, 0.0, -0.953,
-		-0.302, 0.0, -0.953,
-
-		// Right face
-		0.956, 0.0, -0.293,
-		0.956, 0.0, -0.293,
-		0.956, 0.0, -0.293,
-		0.956, 0.0, -0.293,
-
-		// Front face
-		0.296, 0.0, 0.955,
-		0.296, 0.0, 0.955,
-		0.296, 0.0, 0.955,
-		0.296, 0.0, 0.955,
-	};
-
-	GLfloat color_buffer_data[180] = {
-	// Cornell Box
-		// Floor
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		// Ceiling
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		// Left wall
-		1.0f, 0.0f, 0.0f, 
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-
-		// Right wall
-		0.0f, 1.0f, 0.0f, 
-		0.0f, 1.0f, 0.0f, 
-		0.0f, 1.0f, 0.0f, 
-		0.0f, 1.0f, 0.0f, 
-
-		// Back wall
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f, 
-		1.0f, 1.0f, 1.0f, 
-		1.0f, 1.0f, 1.0f,
-
-	// Short Box
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-	// Tall Box
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-	};
-
-	GLuint index_buffer_data[90] = {
-	// Cornell Box
-		0, 1, 2, 	
-		0, 2, 3, 
-		
-		4, 5, 6, 
-		4, 6, 7, 
-
-		8, 9, 10, 
-		8, 10, 11, 
-
-		12, 13, 14, 
-		12, 14, 15, 
-
-		16, 17, 18, 
-		16, 18, 19, 
-
-	// Short Box
-		20, 21, 22,
-		20, 22, 23,
-
-		24, 25, 26,
-		24, 26, 27,
-
-		28, 29, 30,
-		28, 30, 31,
-
-		32, 33, 34,
-		32, 34, 35,
-
-		36, 37, 38,
-		36, 38, 39,
-
-	// Tall Box
-		40, 41, 42,
-		40, 42, 43,
-
-		44, 45, 46,
-		44, 46, 47,
-
-		48, 49, 50,
-		48, 50, 51,
-
-		52, 53, 54,
-		52, 54, 55,
-
-		56, 57, 58,
-		56, 58, 59,
-	};
-
-	GLfloat uv_buffer_data[120] = {
-	// Cornell Box
-		// Floor
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f,
-
-		// Ceiling
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f,
-
-		// Left Wall
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f,
-
-		// Right Wall
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f,
-
-		// Back wall
-		0.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, 0.0f,
-		0.0f, 0.0f,
-
-	// Short Box
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-	// Tall Box
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-	};
-
-	GLuint programID;
-	GLuint depthProgramID;
-
-	Geometry geometry;
-	Lighting lighting;
-
-	void initialize() {
-		// Load shaders for rendering and depth mapping
-		programID = LoadShadersFromFile("../final/shader/box.vert", "../final/shader/box.frag");
-		if (programID == 0) {
-			std::cerr << "Failed to load box shaders." << std::endl;
-		}
-
-		// Initialize Geometry and Lighting
-		geometry.initialize(programID, vertex_buffer_data, index_buffer_data, color_buffer_data, normal_buffer_data, uv_buffer_data,
-							sizeof(vertex_buffer_data), sizeof(index_buffer_data), sizeof(color_buffer_data), sizeof(normal_buffer_data), sizeof(uv_buffer_data),
-							"../final/assets/facade4.jpg");
-		lighting.initialize(programID, shadowMapWidth, shadowMapHeight);
-		depthProgramID = lighting.depthProgramID;
-	}
-
-	void render(glm::mat4 cameraMatrix, glm::mat4 lightSpaceMatrix) {
-		lighting.setLightProperties(lightPosition, lightIntensity, exposure);
-		lighting.performShadowPass(lightSpaceMatrix, geometry.vertexBufferID, geometry.indexBufferID, geometry.indexCount);
-		lighting.prepareLighting();
-		geometry.render(cameraMatrix);
-	}
-
-	void cleanup() {
-		glDeleteProgram(programID);
-		glDeleteProgram(depthProgramID);
-		lighting.cleanup();
-		geometry.cleanup();
-	}
-}; 
 
 int main(void)
 {
@@ -516,7 +69,7 @@ int main(void)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	// Open a window and create its OpenGL context
-	window = glfwCreateWindow(windowWidth, windowHeight, "Lab 3", NULL, NULL);
+	window = glfwCreateWindow(windowWidth, windowHeight, "Final Project", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cerr << "Failed to open a GLFW window." << std::endl;
@@ -573,10 +126,6 @@ int main(void)
 	stool.initialize(ground.programID, glm::vec3(-125.0f, 100.0f, 100.0f), glm::vec3(100.0f, 100.0f, 80.0f),
 		"../final/model/stool/folding_wooden_stool_1k.gltf");
 
-    // Create the classical Cornell Box
-	//CornellBox box;
-	//box.initialize();
-
 	Lighting sceneLight;
 	sceneLight.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
 	sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
@@ -613,27 +162,23 @@ int main(void)
 			//bot.update(time);
 		}
 
-		// Update turning status
-		if (isTurning) {
-			if (currentYaw != targetYaw) {
-				camera.rotate(0.0f, (targetYaw > currentYaw ? turnSpeed : -turnSpeed));
-				currentYaw += (targetYaw > currentYaw ? turnSpeed : -turnSpeed);
-				if (currentYaw == targetYaw) {
-					isTurning = false;
-					currentYaw = fmod(currentYaw, 360.0f);
-					targetYaw = currentYaw;
-				}
-			} 
-			if (currentPitch != targetPitch) {
-				camera.rotate((targetPitch > currentPitch ? turnSpeed : -turnSpeed), 0.0f);
-				currentPitch += (targetPitch > currentPitch ? turnSpeed : -turnSpeed);
-				if (currentPitch == targetPitch) {
-					isTurning = false;
-					currentPitch = fmod(currentPitch, 360.0f);
-					targetPitch = currentPitch;
-				}
-			}
+		// Check for edge turning
+		if (lastMousePos.x <= edgeThreshold) {
+			yaw -= edgeTurnSpeed; // Turn left
 		}
+		else if (lastMousePos.x >= windowWidth - edgeThreshold) {
+			yaw += edgeTurnSpeed; // Turn right
+		}
+
+		// Recalculate the front vector
+		glm::vec3 front;
+		front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+		front.y = sin(glm::radians(pitch));
+		front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+		glm::vec3 cameraFront = glm::normalize(front);
+
+		// Update camera's lookAt
+		camera.updateLookAt(cameraFront);
 
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
@@ -643,18 +188,14 @@ int main(void)
 		lightView = glm::lookAt(lightPosition, glm::vec3(lightPosition.x, lightPosition.y - 1, lightPosition.z), lightUp);
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-		// Render the scene using the shadow map
-		//box.render(vp, lightSpaceMatrix);
+		// Render the scene
 		//bot.render(vp);
 
-		//sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
 		sceneLight.performShadowPass(lightSpaceMatrix, models, planes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		sceneLight.prepareLighting();
 		ground.render(vp);
-		sceneLight.prepareLighting();
 		stool.render(vp);
-		sceneLight.prepareLighting();
 		lamp.render(vp);
 
 		sky.render(vp);
@@ -681,7 +222,6 @@ int main(void)
 	while (!glfwWindowShouldClose(window));
 
 	// Clean up
-	//box.cleanup();
 	sky.cleanup();
 	bot.cleanup();
 	ground.cleanup();
@@ -696,85 +236,60 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 {
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		isTurning = false;
-		camera.reset(); // Reset camera and light position & intensity
-		lightPosition = glm::vec3(-275.0f, 500.0f, -275.0f);
-		lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-	}
-
-	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		if (!isTurning) {
-			camera.move(20.0f); // Move forward
-		}
-	}
-
-	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		if (!isTurning) {
-			camera.move(-20.0f); // Move backward
-		}
-	}
-
-	if (key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		if (!isTurning) {
-			targetYaw = currentYaw + 90.0f; // Turn left
-			isTurning = true;
-		}
-	}
-
-	if (key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
-	{
-		if (!isTurning) {
-			targetYaw = currentYaw - 90.0f; // Turn right
-			isTurning = true;
-		}
+		camera.reset(); // Reset camera
 	}
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isTurning) {
-			targetPitch = currentPitch + 90.0f; // Look up
-			isTurning = true;
-		}
+		camera.move(glm::vec3(0.0f, 0.0f, 20.0f));  // Move forward
 	}
 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		if (!isTurning) {
-			targetPitch = currentPitch - 90.0f; // Look down
-			isTurning = true;
-		}
+		camera.move(glm::vec3(0.0f, 0.0f, -20.0f)); // Move backward
+	}
+
+	if (key == GLFW_KEY_A && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		camera.move(glm::vec3(-20.0f, 0.0f, 0.0f)); // Move left
+	}
+
+	if (key == GLFW_KEY_D && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		camera.move(glm::vec3(20.0f, 0.0f, 0.0f));  // Move right
 	}
 
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
-
-	if (key == GLFW_KEY_I && (action == GLFW_REPEAT || action == GLFW_PRESS)) {
-		lightIntensity *= 1.1f;
-	}
-
-	if (key == GLFW_KEY_K && (action == GLFW_REPEAT || action == GLFW_PRESS)) {
-		lightIntensity /= 1.1f;
-	}
 }
 
-static void cursor_callback(GLFWwindow *window, double xpos, double ypos) {
-	if (xpos < 0 || xpos >= windowWidth || ypos < 0 || ypos > windowHeight) 
-		return;
+static void cursor_callback(GLFWwindow* window, double xpos, double ypos) {
+	// Calculate delta movement
+	glm::vec2 currentMousePos(xpos, ypos);
+	glm::vec2 delta = currentMousePos - lastMousePos;
+	lastMousePos = currentMousePos;
 
-	// Normalize to [0, 1] 
-	float x = xpos / windowWidth;
-	float y = ypos / windowHeight;
+	// Adjust for sensitivity
+	delta *= sensitivity;
 
-	// To [-1, 1] and flip y up 
-	x = x * 2.0f - 1.0f;
-	y = 1.0f - y * 2.0f;
+	// Static variables for camera orientation
+	static glm::vec3 cameraFront(0.0f, 0.0f, -1.0f); // Initial direction the camera is looking
+	static glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);     // Camera's up vector
 
-	const float scale = 800.0f;
-	//lightPosition.x = x * scale - 278;
-	//lightPosition.y = y * scale + 278;
+	// Update yaw and pitch based on delta movement
+	yaw += delta.x;   // Horizontal mouse movement affects yaw
+	pitch -= delta.y; // Vertical mouse movement affects pitch
 
-	//std::cout << lightPosition.x << " " << lightPosition.y << " " << lightPosition.z << std::endl;
+	// Clamp pitch to avoid flipping
+	pitch = glm::clamp(pitch, -89.0f, 89.0f);
+
+	// Recalculate the front vector
+	glm::vec3 front;
+	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	front.y = sin(glm::radians(pitch));
+	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	cameraFront = glm::normalize(front);
+
+	// Update camera's lookAt
+	camera.updateLookAt(cameraFront);
 }
