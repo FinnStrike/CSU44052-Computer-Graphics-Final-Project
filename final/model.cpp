@@ -7,18 +7,11 @@ struct StaticModel {
     // Shader variable IDs
     GLuint mvpMatrixID;
     GLuint jointMatricesID;
-    GLuint lightPositionID;
-    GLuint lightIntensityID;
-    GLuint exposureID;
     GLuint programID;
     GLuint textureSamplerID;
     GLuint modelMatrixID;
     GLuint baseColorFactorID;
     GLuint isLightID;
-
-    glm::vec3 lightIntensity;
-    glm::vec3 lightPosition;
-    float exposure;
 
     glm::mat4 modelMatrix;
 
@@ -123,9 +116,7 @@ struct StaticModel {
         return textureIDs;
     }
 
-
-    void initialize(glm::vec3 lightPosition, glm::vec3 lightIntensity, float exposure, const char * filepath, 
-                    glm::vec3 translation, glm::vec3 scale, GLuint programID) {
+    void initialize(GLuint programID, glm::vec3 translation, glm::vec3 scale, const char * filepath) {
         // Modify your path if needed
         if (!loadModel(model, filepath /*"../final/model/tree/tree_small_02_1k.gltf"*/)) {
             return;
@@ -136,11 +127,6 @@ struct StaticModel {
         modelMatrix = glm::translate(modelMatrix, translation);
         modelMatrix = glm::scale(modelMatrix, scale);
 
-        // Add light Position and Intensity
-        this->lightPosition = lightPosition;
-        this->lightIntensity = lightIntensity;
-        this->exposure = exposure;
-
         // Prepare buffers for rendering
         primitiveObjects = bindModel(model);
 
@@ -150,9 +136,6 @@ struct StaticModel {
         // Get a handle for GLSL variables
         mvpMatrixID = glGetUniformLocation(programID, "MVP");
         modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
-        lightPositionID = glGetUniformLocation(programID, "lightPosition");
-        lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
-        exposureID = glGetUniformLocation(programID, "exposure");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
         baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
         isLightID = glGetUniformLocation(programID, "isLight");

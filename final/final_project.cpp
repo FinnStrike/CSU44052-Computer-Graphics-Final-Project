@@ -31,13 +31,13 @@ static float exposure = 2.0f;
 
 // Shadow mapping
 static glm::vec3 lightUp(0, 0, 1);
-static int shadowMapWidth = 1024;
-static int shadowMapHeight = 1024;
+static int shadowMapWidth = 2048;
+static int shadowMapHeight = 2048;
 
 // DONE: set these parameters 
 static float depthFoV = 120.0f;
 static float depthNear = 10.0f;
-static float depthFar = 2000.0f;
+static float depthFar = 4000.0f;
 
 bool isTurning = false;
 float currentYaw = 0.0f;
@@ -562,8 +562,16 @@ int main(void)
 
 	// A Street Lamp
 	StaticModel lamp;
-	lamp.initialize(lightPosition, lightIntensity, exposure, "../final/model/lamp/street_lamp_01_1k.gltf",
-		glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(100.0f, 100.0f, 100.0f), ground.programID);
+	lamp.initialize(ground.programID, glm::vec3(-275.0f, 100.0f, 0.0f), glm::vec3(100.0f, 100.0f, 100.0f), 
+		"../final/model/lamp/street_lamp_01_1k.gltf");
+
+	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-275.0f, 427.5f, 0.0f));
+	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+
+	// A Folding Stool
+	StaticModel stool;
+	stool.initialize(ground.programID, glm::vec3(-125.0f, 100.0f, 100.0f), glm::vec3(100.0f, 100.0f, 80.0f),
+		"../final/model/stool/folding_wooden_stool_1k.gltf");
 
     // Create the classical Cornell Box
 	//CornellBox box;
@@ -574,7 +582,8 @@ int main(void)
 	sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
 
 	std::vector<StaticModel> models;
-	models.push_back(lamp);
+	//models.push_back(lamp);
+	models.push_back(stool);
 
 	std::vector<Plane> planes;
 	planes.push_back(ground);
@@ -638,11 +647,13 @@ int main(void)
 		//box.render(vp, lightSpaceMatrix);
 		//bot.render(vp);
 
-		sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
+		//sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
 		sceneLight.performShadowPass(lightSpaceMatrix, models, planes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		sceneLight.prepareLighting();
 		ground.render(vp);
+		sceneLight.prepareLighting();
+		stool.render(vp);
 		sceneLight.prepareLighting();
 		lamp.render(vp);
 
@@ -762,8 +773,8 @@ static void cursor_callback(GLFWwindow *window, double xpos, double ypos) {
 	y = 1.0f - y * 2.0f;
 
 	const float scale = 800.0f;
-	lightPosition.x = x * scale - 278;
-	lightPosition.y = y * scale + 278;
+	//lightPosition.x = x * scale - 278;
+	//lightPosition.y = y * scale + 278;
 
 	//std::cout << lightPosition.x << " " << lightPosition.y << " " << lightPosition.z << std::endl;
 }

@@ -194,7 +194,7 @@ struct Skybox {
 		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 
 		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox("../final/assets/sky.png");
+		textureID = LoadTextureTileBox("../final/assets/stars.png");
 
 		// Get a handle for our "textureSampler" uniform
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
