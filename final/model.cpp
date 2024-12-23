@@ -312,11 +312,6 @@ struct StaticModel {
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
         glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
-        // Set light data 
-        glUniform3fv(lightPositionID, 1, &lightPosition[0]);
-        glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-        glUniform1f(exposureID, exposure);
-
         // Render each primitive
         for (const auto& primitive : primitiveObjects) {
             glBindVertexArray(primitive.vao);
