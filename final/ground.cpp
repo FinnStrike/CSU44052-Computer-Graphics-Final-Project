@@ -42,6 +42,8 @@ struct Plane {
 	GLuint uvBufferID;
 	GLuint textureID;
 	GLuint modelMatrixID;
+	GLuint baseColorFactorID;
+	GLuint isLightID;
 
 	// Shader variable IDs
 	GLuint mvpMatrixID;
@@ -102,6 +104,8 @@ struct Plane {
 
 		// Get a handle for our "textureSampler" uniform
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+		baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
+		isLightID = glGetUniformLocation(programID, "isLight");
 	}
 
 	void render(glm::mat4 cameraMatrix) {
@@ -133,6 +137,11 @@ struct Plane {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glUniform1i(textureSamplerID, 0);
+
+		// Set base colour factor to opaque
+		glm::vec4 baseColorFactor = glm::vec4(1.0);
+		glUniform4fv(baseColorFactorID, 1, &baseColorFactor[0]);
+		glUniform1i(isLightID, 0);
 
 		// Draw the box
 		glDrawElements(

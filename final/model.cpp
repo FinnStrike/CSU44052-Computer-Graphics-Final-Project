@@ -13,6 +13,8 @@ struct StaticModel {
     GLuint programID;
     GLuint textureSamplerID;
     GLuint modelMatrixID;
+    GLuint baseColorFactorID;
+    GLuint isLightID;
 
     glm::vec3 lightIntensity;
     glm::vec3 lightPosition;
@@ -29,6 +31,8 @@ struct StaticModel {
         int indexCount;
         GLenum indexType;
         GLuint textureID;
+        glm::vec4 baseColorFactor;
+        bool isLight;
     };
     std::vector<PrimitiveObject> primitiveObjects;
 
@@ -150,6 +154,8 @@ struct StaticModel {
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
         exposureID = glGetUniformLocation(programID, "exposure");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+        baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
+        isLightID = glGetUniformLocation(programID, "isLight");
     }
 
     void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
@@ -284,15 +290,35 @@ struct StaticModel {
                     primitiveObject.indexType = indexAccessor.componentType;
                 }
 
-                // Bind texture to the primitive
+                // Bind texture and retrieve baseColorFactor
                 if (primitive.material >= 0) {
                     const tinygltf::Material& material = model.materials[primitive.material];
+
                     if (material.pbrMetallicRoughness.baseColorTexture.index >= 0) {
-                        primitiveObject.textureID = textureIDs[material.pbrMetallicRoughness.baseColorTexture.index];
+                        int textureIndex = material.pbrMetallicRoughness.baseColorTexture.index;
+                        primitiveObject.textureID = textureIDs[textureIndex];
                     }
+                    else {
+                        primitiveObject.textureID = 0;
+                    }
+
+                    // Extract baseColorFactor
+                    if (material.pbrMetallicRoughness.baseColorFactor.size() == 4) {
+                        primitiveObject.baseColorFactor = glm::vec4(
+                            material.pbrMetallicRoughness.baseColorFactor[0],
+                            material.pbrMetallicRoughness.baseColorFactor[1],
+                            material.pbrMetallicRoughness.baseColorFactor[2],
+                            material.pbrMetallicRoughness.baseColorFactor[3]
+                        );
+                    }
+                    else {
+                        primitiveObject.baseColorFactor = glm::vec4(1.0f); // Default to opaque white
+                    }
+                    primitiveObject.isLight = (material.name == "street_lamp_01_bulb");
                 }
                 else {
                     primitiveObject.textureID = 0;
+                    primitiveObject.baseColorFactor = glm::vec4(1.0f); // Default to opaque white
                 }
 
                 glBindVertexArray(0);
@@ -304,6 +330,8 @@ struct StaticModel {
 
     void render(const glm::mat4& cameraMatrix) {
         glUseProgram(programID);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Combine transformations with the camera matrix
         glm::mat4 mvpMatrix = cameraMatrix * modelMatrix;
@@ -312,19 +340,60 @@ struct StaticModel {
         glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
         glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
-        // Render each primitive
+        // Separate opaque and transparent objects
+        std::vector<const PrimitiveObject*> opaqueObjects;
+        std::vector<const PrimitiveObject*> transparentObjects;
+
         for (const auto& primitive : primitiveObjects) {
-            glBindVertexArray(primitive.vao);
-            if (primitive.textureID) {
+            if (primitive.baseColorFactor.a < 1.0f) {
+                transparentObjects.push_back(&primitive);
+            }
+            else {
+                opaqueObjects.push_back(&primitive);
+            }
+        }
+
+        // Render opaque objects first
+        for (const auto* primitive : opaqueObjects) {
+            glBindVertexArray(primitive->vao);
+
+            if (primitive->textureID) {
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, primitive.textureID);
+                glBindTexture(GL_TEXTURE_2D, primitive->textureID);
                 glUniform1i(textureSamplerID, 0);
             }
-            glDrawElements(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0);
+
+            glUniform1i(isLightID, primitive->isLight ? 1 : 0);
+            glUniform4fv(baseColorFactorID, 1, &primitive->baseColorFactor[0]);
+            glDrawElements(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+
+        // Sort transparent objects by distance from the camera
+        std::sort(transparentObjects.begin(), transparentObjects.end(),
+            [&cameraMatrix](const PrimitiveObject* a, const PrimitiveObject* b) {
+                glm::vec3 aPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // Center of object A
+                glm::vec3 bPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // Center of object B
+                return glm::length(aPos) > glm::length(bPos); // Sort back-to-front
+            });
+
+        // Render transparent objects
+        for (const auto* primitive : transparentObjects) {
+            glBindVertexArray(primitive->vao);
+
+            if (primitive->textureID) {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, primitive->textureID);
+                glUniform1i(textureSamplerID, 0);
+            }
+            glUniform1i(isLightID, primitive->isLight ? 1 : 0);
+            glUniform4fv(baseColorFactorID, 1, &primitive->baseColorFactor[0]);
+            glDrawElements(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         // Reset state
+        glDisable(GL_BLEND);
         glUseProgram(0);
         glBindVertexArray(0);
     }
