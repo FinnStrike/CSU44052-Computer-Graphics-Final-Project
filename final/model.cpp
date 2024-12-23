@@ -9,7 +9,6 @@ struct StaticModel {
     GLuint jointMatricesID;
     GLuint programID;
     GLuint textureSamplerID;
-    GLuint modelMatrixID;
     GLuint baseColorFactorID;
     GLuint isLightID;
 
@@ -26,6 +25,9 @@ struct StaticModel {
         GLuint textureID;
         glm::vec4 baseColorFactor;
         bool isLight;
+        GLuint instanceVBO;
+        int instanceCount;
+
     };
     std::vector<PrimitiveObject> primitiveObjects;
 
@@ -116,29 +118,47 @@ struct StaticModel {
         return textureIDs;
     }
 
-    void initialize(GLuint programID, glm::vec3 translation, glm::vec3 scale, const char * filepath) {
+    void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms, const char * filepath) {
         // Modify your path if needed
         if (!loadModel(model, filepath /*"../final/model/tree/tree_small_02_1k.gltf"*/)) {
             return;
         }
 
-        // Scale and translate the model
-        modelMatrix = glm::mat4(1.0f);
-        modelMatrix = glm::translate(modelMatrix, translation);
-        modelMatrix = glm::scale(modelMatrix, scale);
-
         // Prepare buffers for rendering
         primitiveObjects = bindModel(model);
+
+        // Prepare Instance buffer
+        for (auto& primitive : primitiveObjects) {
+            setupInstanceBuffer(primitive, instanceTransforms);
+        }
 
         // Create and compile our GLSL program from the shaders
         this->programID = programID;
 
         // Get a handle for GLSL variables
         cameraMatrixID = glGetUniformLocation(programID, "camera");
-        modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
         textureSamplerID = glGetUniformLocation(programID, "textureSampler");
         baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
         isLightID = glGetUniformLocation(programID, "isLight");
+    }
+
+    void setupInstanceBuffer(PrimitiveObject& primitiveObject, const std::vector<glm::mat4>& instanceTransforms) {
+        glGenBuffers(1, &primitiveObject.instanceVBO);
+        glBindBuffer(GL_ARRAY_BUFFER, primitiveObject.instanceVBO);
+        glBufferData(GL_ARRAY_BUFFER, instanceTransforms.size() * sizeof(glm::mat4), instanceTransforms.data(), GL_STATIC_DRAW);
+
+        glBindVertexArray(primitiveObject.vao);
+
+        // Enable and set instance attributes (4x vec4 for mat4)
+        for (int i = 0; i < 4; i++) {
+            glEnableVertexAttribArray(3 + i); // Instance matrix starts at location 3
+            glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+            glVertexAttribDivisor(3 + i, 1); // Advance per instance
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        primitiveObject.instanceCount = instanceTransforms.size();
     }
 
     void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
@@ -335,7 +355,12 @@ struct StaticModel {
         // Render opaque objects first
         for (const auto* primitive : opaqueObjects) {
             glBindVertexArray(primitive->vao);
-
+            glBindBuffer(GL_ARRAY_BUFFER, primitive->instanceVBO);
+            for (int i = 0; i < 4; ++i) {
+                glEnableVertexAttribArray(3 + i);
+                glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+                glVertexAttribDivisor(3 + i, 1);
+            }
             if (primitive->textureID) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, primitive->textureID);
@@ -344,7 +369,7 @@ struct StaticModel {
 
             glUniform1i(isLightID, primitive->isLight ? 1 : 0);
             glUniform4fv(baseColorFactorID, 1, &primitive->baseColorFactor[0]);
-            glDrawElements(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0);
+            glDrawElementsInstanced(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0, primitive->instanceCount);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
@@ -359,7 +384,12 @@ struct StaticModel {
         // Render transparent objects
         for (const auto* primitive : transparentObjects) {
             glBindVertexArray(primitive->vao);
-
+            glBindBuffer(GL_ARRAY_BUFFER, primitive->instanceVBO);
+            for (int i = 0; i < 4; ++i) {
+                glEnableVertexAttribArray(3 + i);
+                glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+                glVertexAttribDivisor(3 + i, 1);
+            }
             if (primitive->textureID) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, primitive->textureID);
@@ -367,12 +397,15 @@ struct StaticModel {
             }
             glUniform1i(isLightID, primitive->isLight ? 1 : 0);
             glUniform4fv(baseColorFactorID, 1, &primitive->baseColorFactor[0]);
-            glDrawElements(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0);
+            glDrawElementsInstanced(GL_TRIANGLES, primitive->indexCount, primitive->indexType, 0, primitive->instanceCount);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         // Reset state
         glDisable(GL_BLEND);
+        for (int i = 0; i < 4; ++i) {
+            glDisableVertexAttribArray(3 + i);
+        }
         glUseProgram(0);
         glBindVertexArray(0);
     }
@@ -386,10 +419,19 @@ struct StaticModel {
         // Render each primitive
         for (const auto& primitive : primitiveObjects) {
             glBindVertexArray(primitive.vao);
-            glDrawElements(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0);
+            glBindBuffer(GL_ARRAY_BUFFER, primitive.instanceVBO);
+            for (int i = 0; i < 4; ++i) {
+                glEnableVertexAttribArray(3 + i);
+                glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+                glVertexAttribDivisor(3 + i, 1);
+            }
+            glDrawElementsInstanced(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0, primitive.instanceCount);
         }
 
         // Reset state
+        for (int i = 0; i < 4; ++i) {
+            glDisableVertexAttribArray(3 + i);
+        }
         glBindVertexArray(0);
         glUseProgram(0);
     }
