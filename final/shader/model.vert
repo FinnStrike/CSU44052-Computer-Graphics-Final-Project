@@ -10,12 +10,13 @@ out vec3 worldPosition;
 out vec3 worldNormal;
 out vec2 uv;
 
-// Matrix for vertex transformation
-uniform mat4 MVP;
+// Matrices for vertex transformation
+uniform mat4 camera;
+uniform mat4 transform;
 
 void main() {
     // Transform vertex
-    gl_Position =  MVP * vec4(vertexPosition, 1);
+    gl_Position = camera * transform * vec4(vertexPosition, 1);
 
     // World-space geometry 
     worldPosition = vertexPosition;

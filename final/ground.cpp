@@ -41,12 +41,13 @@ struct Plane {
 	GLuint normalBufferID;
 	GLuint uvBufferID;
 	GLuint textureID;
+	GLuint cameraMatrixID;
+	GLuint transformMatrixID;
 	GLuint modelMatrixID;
 	GLuint baseColorFactorID;
 	GLuint isLightID;
 
 	// Shader variable IDs
-	GLuint mvpMatrixID;
 	GLuint textureSamplerID;
 	GLuint programID;
 
@@ -91,8 +92,9 @@ struct Plane {
 			std::cerr << "Failed to load shaders." << std::endl;
 		}
 
-		// Get a handle for our "MVP" uniform
-		mvpMatrixID = glGetUniformLocation(programID, "MVP");
+		// Get a handle for our "MVP" uniforms
+		cameraMatrixID = glGetUniformLocation(programID, "camera");
+		transformMatrixID = glGetUniformLocation(programID, "transform");
 
 		// Get a handle for our Model Matrix uniform
 		modelMatrixID = glGetUniformLocation(programID, "modelMatrix");
@@ -121,9 +123,9 @@ struct Plane {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
-		// Set model-view-projection matrix
-		glm::mat4 mvp = cameraMatrix * modelMatrix;
-		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
+		// Pass in model-view-projection matrix
+		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
+		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 		glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &modelMatrix[0][0]);
 
 		// Enable UV buffer and texture sampler
@@ -154,14 +156,12 @@ struct Plane {
 		glDisableVertexAttribArray(2);
 	}
 
-	void renderDepth(GLuint programID, GLuint mvpMatrixID, const glm::mat4& lightSpaceMatrix) {
+	void renderDepth(GLuint programID, GLuint lightMatID, GLuint tranMatID, const glm::mat4& lightSpaceMatrix) {
 		glUseProgram(programID);
 
-		// Combine transformations with the camera matrix
-		glm::mat4 mvpMatrix = lightSpaceMatrix * modelMatrix;
-
-		// Pass the updated MVP matrix to the shader
-		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvpMatrix[0][0]);
+		// Pass the MVP matrix to the shader
+		glUniformMatrix4fv(lightMatID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+		glUniformMatrix4fv(tranMatID, 1, GL_FALSE, &modelMatrix[0][0]);
 
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);

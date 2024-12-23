@@ -12,7 +12,8 @@ public:
     GLuint lightIntensityID;
     GLuint lightSpaceMatrixID;
     GLuint lightExposureID;
-    GLuint depthMatrixID;
+    GLuint lightSpaceID;
+    GLuint transformID;
     GLuint shadowFBO;
     GLuint shadowTexture;
 
@@ -38,7 +39,8 @@ public:
         lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
         lightExposureID = glGetUniformLocation(programID, "exposure");
         lightSpaceMatrixID = glGetUniformLocation(programID, "lightSpaceMatrix");
-        depthMatrixID = glGetUniformLocation(depthProgramID, "MVP");
+        lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
+        transformID = glGetUniformLocation(depthProgramID, "transform");
 
         // Record shadow map size
         this->shadowMapWidth = shadowMapWidth;
@@ -76,28 +78,6 @@ public:
         for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
     }
 
-    void performShadowPass(glm::mat4 lightSpaceMatrix, GLuint vertexBufferID, GLuint indexBufferID, int indexCount) {
-        // Record Light Space Matrix
-        this->lightSpaceMatrix = lightSpaceMatrix;
-
-        // Perform Shadow pass
-        glUseProgram(depthProgramID);
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        glm::mat4 lightMVP = lightSpaceMatrix;
-        glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &lightMVP[0][0]);
-
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBufferID);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
-        glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (void*)0);
-        glDisableVertexAttribArray(0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
     void performShadowPass(glm::mat4 lightSpaceMatrix, std::vector<StaticModel> models, std::vector<Plane> planes) {
         // Record Light Space Matrix
         this->lightSpaceMatrix = lightSpaceMatrix;
@@ -107,8 +87,8 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        for (auto& model : models) model.renderDepth(depthProgramID, depthMatrixID, lightSpaceMatrix);
-        for (auto& plane : planes) plane.renderDepth(depthProgramID, depthMatrixID, lightSpaceMatrix);
+        for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, transformID, lightSpaceMatrix);
+        for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, transformID, lightSpaceMatrix);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glUseProgram(0);
