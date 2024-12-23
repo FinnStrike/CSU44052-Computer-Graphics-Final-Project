@@ -80,7 +80,16 @@ void main()
 
         // Gamma correction for accurate color perception
         finalColor = texture(textureSampler, uv).rgba * baseColorFactor * vec4(pow(toneMappedColor, vec3(1.0 / 2.2)), 1.0);
+
+        // Tint glass yellow
+        if (baseColorFactor.a < 1.0) {
+            finalColor = vec4(mix(finalColor.rgb, vec3(1.0, 1.0, 0.0), 0.5), finalColor.a);
+        }
+
     } else {
+        
+        // Apply solid yellow to light objects
         finalColor = vec4(1.0, 1.0, 0.0, baseColorFactor.a);
+
     }
 }
