@@ -284,22 +284,32 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 
 	if (key == GLFW_KEY_W && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(0.0f, 0.0f, 20.0f));  // Move forward
+		camera.moveStat(glm::vec3(0.0f, 0.0f, -20.0f));  // Move forward
 	}
 
 	if (key == GLFW_KEY_S && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(0.0f, 0.0f, -20.0f)); // Move backward
+		camera.moveStat(glm::vec3(0.0f, 0.0f, 20.0f)); // Move backward
 	}
 
 	if (key == GLFW_KEY_A && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(-20.0f, 0.0f, 0.0f)); // Move left
+		camera.moveStat(glm::vec3(20.0f, 0.0f, 0.0f)); // Move left
 	}
 
 	if (key == GLFW_KEY_D && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
-		camera.move(glm::vec3(20.0f, 0.0f, 0.0f));  // Move right
+		camera.moveStat(glm::vec3(-20.0f, 0.0f, 0.0f));  // Move right
+	}
+
+	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		camera.fly(glm::vec3(0.0f, 20.0f, 0.0f));  // Move up
+	}
+
+	if (key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	{
+		camera.fly(glm::vec3(0.0f, -20.0f, 0.0f));  // Move down
 	}
 
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)

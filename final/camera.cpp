@@ -14,7 +14,7 @@ struct Camera {
 
     Camera(glm::vec3 pos, glm::vec3 lookAt, glm::vec3 up, float fov, float nearPlane, float farPlane, float aspectRatio)
         : position(pos), lookAt(lookAt), up(up), fov(fov), nearPlane(nearPlane), farPlane(farPlane), aspectRatio(aspectRatio),
-          initialPos(pos), initialLookAt(lookAt), initialUp(up) {}
+        initialPos(pos), initialLookAt(lookAt), initialUp(up) {}
 
     // Reset the Camera to initial settings
     void reset() {
@@ -33,13 +33,26 @@ struct Camera {
         return glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
     }
 
-    // Method to update the position of the camera based on a glm::vec3 delta
-    void move(const glm::vec3& delta) {
-        glm::vec3 forward = glm::normalize(lookAt - position);
+    // Method to update the position of the camera without changing height based on a glm::vec3 delta
+    void moveStat(const glm::vec3& delta) {
+        glm::vec3 forward = glm::normalize(glm::vec3(position.x - lookAt.x, 0.0f, position.z - lookAt.z));
+        glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        position += forward * delta.z + right * delta.x;
+        lookAt += forward * delta.z + right * delta.x;
+    }
+
+    // Method to update the position of the camera relative to lookAt based on a glm::vec3 delta
+    void moveSpec(const glm::vec3& delta) {
+        glm::vec3 forward = glm::normalize(position - lookAt);
         glm::vec3 right = glm::normalize(glm::cross(forward, up));
         glm::vec3 up = glm::normalize(glm::cross(right, forward));
         position += forward * delta.z + right * delta.x + up * delta.y;
         lookAt += forward * delta.z + right * delta.x + up * delta.y;
+    }
+
+    void fly(const glm::vec3& delta) {
+        position += up * delta.y;
+        lookAt += up * delta.y;
     }
 
     // Method to adjust the field of view (zooming in and out)
