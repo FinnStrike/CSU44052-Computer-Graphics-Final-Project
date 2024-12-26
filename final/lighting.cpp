@@ -3,20 +3,19 @@
 #include <model.cpp>
 #include <ground.cpp>
 
+struct Light {
+    glm::vec3 position;
+    glm::vec3 intensity;
+    float exposure;
+    glm::mat4 lightSpaceMatrix;
+    GLuint shadowTexture;
+    GLuint shadowFBO;
+};
+
 class Lighting {
 public:
-    glm::vec3 lightPosition, lightIntensity;
-    float lightExposure;
 
-    GLuint lightPositionID;
-    GLuint lightIntensityID;
-    GLuint lightSpaceMatrixID;
-    GLuint lightExposureID;
-    GLuint lightSpaceID;
-    GLuint shadowFBO;
-    GLuint shadowTexture;
-
-    glm::mat4 lightSpaceMatrix;
+    std::vector<Light> lights;
 
     int shadowMapWidth, shadowMapHeight;
 
@@ -25,28 +24,28 @@ public:
     bool saveDepth = true;
 
     void initialize(GLuint programID, int shadowMapWidth, int shadowMapHeight) {
-        // Set program IDs
         this->programID = programID;
+        this->shadowMapWidth = shadowMapWidth;
+        this->shadowMapHeight = shadowMapHeight;
 
         depthProgramID = LoadShadersFromFile("../final/shader/depth.vert", "../final/shader/depth.frag");
         if (depthProgramID == 0) {
             std::cerr << "Failed to load depth shaders." << std::endl;
         }
+    }
 
-        // Initialize light and shadow uniform locations
-        lightPositionID = glGetUniformLocation(programID, "lightPosition");
-        lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
-        lightExposureID = glGetUniformLocation(programID, "exposure");
-        lightSpaceMatrixID = glGetUniformLocation(programID, "lightSpaceMatrix");
-        lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
+    void addLight(glm::vec3 position, glm::vec3 intensity, float exposure) {
+        Light light;
+        light.position = position;
+        light.intensity = intensity;
+        light.exposure = exposure;
 
-        // Record shadow map size
-        this->shadowMapWidth = shadowMapWidth;
-        this->shadowMapHeight = shadowMapHeight;
+        // Lower Light Intensity (starts off extremely high otherwise)
+        for (int i = 0; i < 125; i++) light.intensity /= 1.1f;
 
         // Create shadow texture
-        glGenTextures(1, &shadowTexture);
-        glBindTexture(GL_TEXTURE_2D, shadowTexture);
+        glGenTextures(1, &light.shadowTexture);
+        glBindTexture(GL_TEXTURE_2D, light.shadowTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -54,9 +53,9 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         // Create shadow framebuffer
-        glGenFramebuffers(1, &shadowFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTexture, 0);
+        glGenFramebuffers(1, &light.shadowFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, light.shadowTexture, 0);
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
 
@@ -65,33 +64,34 @@ public:
             std::cerr << "Error: Shadow framebuffer is not complete!" << std::endl;
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        lights.push_back(light);
     }
 
-    void setLightProperties(glm::vec3 position, glm::vec3 intensity, float exposure) {
-        lightPosition = position;
-        lightIntensity = intensity;
-        lightExposure = exposure;
-
-        // Lower Light Intensity (starts off extremely high otherwise)
-        for (int i = 0; i < 125; i++) lightIntensity /= 1.1f;
-    }
-
-    void performShadowPass(glm::mat4 lightSpaceMatrix, std::vector<StaticModel> models, std::vector<Plane> planes) {
-        // Record Light Space Matrix
-        this->lightSpaceMatrix = lightSpaceMatrix;
-
+    void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Plane> planes) {
         // Perform Shadow pass
         glUseProgram(depthProgramID);
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-        glClear(GL_DEPTH_BUFFER_BIT);
+        GLuint lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
 
-        for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, lightSpaceMatrix);
-        for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, lightSpaceMatrix);
+        for (int i = 0; i < lights.size(); i++) {
+            Light light = lights[i];
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glUseProgram(0);
+            // Compute light space matrix
+            glm::vec3 lookAt = glm::vec3(light.position.x, light.position.y - 1, light.position.z);
+            glm::mat4 lightView = glm::lookAt(light.position, lookAt, glm::vec3(0, 0, 1));
+            light.lightSpaceMatrix = lightProjection * lightView;
 
-        if (saveDepth) saveDepthTexture(shadowFBO, "depth.png");
+            glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
+            for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glUseProgram(0);
+
+            if (saveDepth) saveDepthTexture(light.shadowFBO, "depth" + std::to_string(i) + ".png");
+        }
         saveDepth = false;
     }
 
@@ -100,18 +100,26 @@ public:
 
         GLuint shadowMapID = glGetUniformLocation(programID, "shadowMap");
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, shadowTexture);
+        glBindTexture(GL_TEXTURE_2D, lights[0].shadowTexture);
         glUniform1i(shadowMapID, 1);
 
-        glUniform3fv(lightPositionID, 1, &lightPosition[0]);
-        glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-        glUniform1f(lightExposureID, lightExposure);
-        glUniformMatrix4fv(lightSpaceMatrixID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+        for (int i = 0; i < lights.size(); ++i) {
+            std::string index = std::to_string(i);
+
+            glUniform3fv(glGetUniformLocation(programID, ("lightPositions[" + index + "]").c_str()), 1, &lights[i].position[0]);
+            glUniform3fv(glGetUniformLocation(programID, ("lightIntensities[" + index + "]").c_str()), 1, &lights[i].intensity[0]);
+            glUniform1f(glGetUniformLocation(programID, ("lightExposures[" + index + "]").c_str()), lights[i].exposure);
+            glUniformMatrix4fv(glGetUniformLocation(programID, ("lightSpaceMatrices[" + index + "]").c_str()), 1, GL_FALSE, &lights[i].lightSpaceMatrix[0][0]);
+        }
+
+        glUniform1i(glGetUniformLocation(programID, "lightCount"), lights.size());
     }
 
     void cleanup() {
-        glDeleteTextures(1, &shadowTexture);
-        glDeleteFramebuffers(1, &shadowFBO);
+        for (auto& light : lights) {
+            glDeleteTextures(1, &light.shadowTexture);
+            glDeleteFramebuffers(1, &light.shadowFBO);
+        }
     }
 
     void saveDepthTexture(GLuint fbo, std::string filename) {

@@ -6,12 +6,12 @@
 #include <geometry.cpp>
 #include <lighting.cpp>
 
-static GLFWwindow *window;
+static GLFWwindow* window;
 static int windowWidth = 1024;
 static int windowHeight = 768;
 
-static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
-static void cursor_callback(GLFWwindow *window, double xpos, double ypos);
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+static void cursor_callback(GLFWwindow* window, double xpos, double ypos);
 
 // OpenGL camera view parameters
 static glm::vec3 eye_center(-278.0f, 273.0f, 800.0f);
@@ -43,7 +43,7 @@ static float depthFar = 4000.0f;
 static glm::vec2 lastMousePos(windowWidth / 2.0f, windowHeight / 2.0f);
 static float sensitivity = 0.1f;
 static double edgeThreshold = 50.0; // Pixels from the edge of the screen
-static float edgeTurnSpeed = 0.5f;  // Degrees per frame (adjust as needed)
+static float edgeTurnSpeed = 1.0f;  // Degrees per frame (adjust as needed)
 static float yaw = -90.0f;
 static float pitch = 0.0f;
 
@@ -93,7 +93,7 @@ int main(void)
 	}
 
 	// Prepare shadow map size for shadow mapping. Usually this is the size of the window itself, but on some platforms like Mac this can be 2x the size of the window. Use glfwGetFramebufferSize to get the shadow map size properly. 
-    glfwGetFramebufferSize(window, &shadowMapWidth, &shadowMapHeight);
+	glfwGetFramebufferSize(window, &shadowMapWidth, &shadowMapHeight);
 
 	// Background
 	glClearColor(0.2f, 0.2f, 0.25f, 0.0f);
@@ -114,7 +114,7 @@ int main(void)
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((j * 1024.0f) - 275.0f, 100.0f, 0.0f + (i * 1024.0f)));
+			g = glm::translate(g, glm::vec3((i * 1024.0f) - 275.0f, 100.0f, 0.0f + (j * 1024.0f)));
 			g = glm::scale(g, glm::vec3(1024, 0, 1024));
 			gts.push_back(g);
 		}
@@ -137,7 +137,7 @@ int main(void)
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((j * 1024.0f) - 275.0f, 100.0f, 0.0f + (i * 1024.0f)));
+			g = glm::translate(g, glm::vec3((i * 1024.0f) - 275.0f, 100.0f, 0.0f + (j * 1024.0f)));
 			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
 			lts.push_back(g);
 		}
@@ -146,9 +146,6 @@ int main(void)
 	// A Street Lamp
 	StaticModel lamp;
 	lamp.initialize(ground.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
-
-	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-275.0f, 427.5f, 0.0f));
-	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 	std::vector<glm::mat4> sts;
 	glm::mat4 st(1.0f);
@@ -159,7 +156,7 @@ int main(void)
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((j * 1024.0f) - 125.0f, 100.0f, 100.0f + (i * 1024.0f)));
+			g = glm::translate(g, glm::vec3((i * 1024.0f) - 125.0f, 100.0f, 100.0f + (j * 1024.0f)));
 			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
 			sts.push_back(g);
 		}
@@ -169,9 +166,19 @@ int main(void)
 	StaticModel stool;
 	stool.initialize(ground.programID, sts, "../final/model/stool/folding_wooden_stool_1k.gltf");
 
-	Lighting sceneLight;
-	sceneLight.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
-	sceneLight.setLightProperties(lightPosition, lightIntensity, exposure);
+	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-275.0f, 427.5f, 0.0f));
+	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+
+	Lighting lighting;
+	lighting.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
+	lighting.addLight(lightPosition, lightIntensity, exposure);
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(i * 1024.0f, 0.0f, j * 1024.0f));
+			glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0));
+			lighting.addLight(p, lightIntensity, exposure);
+		}
+	}
 
 	std::vector<StaticModel> models;
 	//models.push_back(lamp);
@@ -181,7 +188,7 @@ int main(void)
 	//planes.push_back(ground);
 
 	// Camera setup
-	glm::mat4 viewMatrix, projectionMatrix, lightView, lightProjection;
+	glm::mat4 viewMatrix, projectionMatrix, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
 	lightProjection = glm::perspective(glm::radians(depthFoV), (float)shadowMapWidth / shadowMapHeight, depthNear, depthFar);
 
@@ -226,17 +233,13 @@ int main(void)
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
 		glm::mat4 vp = projectionMatrix * viewMatrix;
-
-		// Compute light space matrix
-		lightView = glm::lookAt(lightPosition, glm::vec3(lightPosition.x, lightPosition.y - 1, lightPosition.z), lightUp);
-		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
 		// Render the scene
 		//bot.render(vp);
 
-		sceneLight.performShadowPass(lightSpaceMatrix, models, planes);
+		lighting.performShadowPass(lightProjection, models, planes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-		sceneLight.prepareLighting();
+		//glViewport(0, 0, windowWidth, windowHeight);
+		lighting.prepareLighting();
 		ground.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
@@ -275,7 +278,7 @@ int main(void)
 	return 0;
 }
 
-static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode)
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
