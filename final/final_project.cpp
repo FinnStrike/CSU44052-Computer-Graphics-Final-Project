@@ -263,13 +263,12 @@ int main(void)
 		lighting.performShadowPass(lightProjection, models, planes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		//glViewport(0, 0, windowWidth, windowHeight);
-		lighting.prepareLighting();
+		sky.updatePosition(cameraPos);
+		sky.render(vp);
+		lighting.prepareLighting(cameraPos);
 		ground.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
-
-		sky.updatePosition(cameraPos);
-		sky.render(vp);
 
 		// FPS tracking 
 		// Count number of frames over a few seconds and take average

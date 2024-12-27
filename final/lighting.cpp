@@ -144,7 +144,7 @@ public:
         glUseProgram(0);
     }
 
-    void prepareLighting() {
+    void prepareLighting(glm::vec3 cameraPos) {
         glUseProgram(programID);
 
         for (int i = 0; i < lights.size(); ++i) {
@@ -160,6 +160,8 @@ public:
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
         glUniform1i(shadowMapArrayID, 1);
+
+        glUniform3fv(glGetUniformLocation(programID, "cameraPosition"), 1, &cameraPos[0]);
 
         glUniform1i(glGetUniformLocation(programID, "lightCount"), lights.size());
     }

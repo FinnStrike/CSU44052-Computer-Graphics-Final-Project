@@ -12,12 +12,17 @@ uniform int isLight;
 out vec4 finalColor;
 
 const int MAX_LIGHTS = 50;
+const float FOG_MIN_DIST = 1024;
+const float FOG_MAX_DIST = 2048;
+const vec4 FOG_COLOUR = vec4(0.004f, 0.02f, 0.05f, 0.0);
+
 uniform int lightCount;
 uniform vec3 lightPositions[MAX_LIGHTS];
 uniform vec3 lightIntensities[MAX_LIGHTS];
 uniform float lightExposures[MAX_LIGHTS];
 uniform sampler2DArray shadowMapArray;
 uniform mat4 lightSpaceMatrices[MAX_LIGHTS];
+uniform vec3 cameraPosition;
 
 void main()
 {
@@ -71,10 +76,19 @@ void main()
 
         vec3 exposedColor = finalLighting;
         vec3 toneMappedColor = exposedColor / (exposedColor + vec3(1.0));
-        finalColor = texture(textureSampler, uv).rgba * baseColorFactor * vec4(pow(toneMappedColor, vec3(1.0 / 2.2)), 1.0);
+        vec4 baseColor = texture(textureSampler, uv).rgba * baseColorFactor;
+        vec4 fragColor = vec4(pow(toneMappedColor, vec3(1.0 / 2.2)), 1.0) * baseColor;
+
+        float distanceToCamera = length(fragPosition - cameraPosition);
+        float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);
+
+        finalColor = mix(fragColor, FOG_COLOUR, fogFactor);
         if (baseColorFactor.a < 1.0) finalColor = vec4(mix(finalColor.rgb, vec3(1.0, 1.0, 0.0), 0.5), finalColor.a);
     }
     else {
-        finalColor = vec4(1.0, 1.0, 0.0, baseColorFactor.a);
+        vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
+        float distanceToCamera = length(fragPosition - cameraPosition);
+        float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);
+        finalColor = mix(vec4(1.0, 1.0, 0.0, baseColorFactor.a), FOG_COLOUR, fogFactor);
     }
 }
