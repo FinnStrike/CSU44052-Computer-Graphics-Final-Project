@@ -171,18 +171,18 @@ int main(void)
 
 	Lighting lighting;
 	lighting.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
-	lighting.addLight(lightPosition, lightIntensity, exposure);
+	//lighting.addLight(lightPosition, lightIntensity, exposure);
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(i * 1024.0f, 0.0f, j * 1024.0f));
-			glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0));
+			glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
 			lighting.addLight(p, lightIntensity, exposure);
 		}
 	}
 
 	std::vector<StaticModel> models;
-	//models.push_back(lamp);
 	models.push_back(stool);
+	//models.push_back(lamp);
 
 	std::vector<Plane> planes;
 	//planes.push_back(ground);
@@ -305,7 +305,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		camera.moveStat(glm::vec3(-20.0f, 0.0f, 0.0f));  // Move right
 	}
 
-	if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
+	if (key == GLFW_KEY_UP || key == GLFW_KEY_SPACE && (action == GLFW_REPEAT || action == GLFW_PRESS))
 	{
 		camera.fly(glm::vec3(0.0f, 20.0f, 0.0f));  // Move up
 	}

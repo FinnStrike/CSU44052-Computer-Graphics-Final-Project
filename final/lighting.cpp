@@ -8,7 +8,6 @@ struct Light {
     glm::vec3 intensity;
     float exposure;
     glm::mat4 lightSpaceMatrix;
-    GLuint shadowTexture;
     GLuint shadowFBO;
 };
 
@@ -16,10 +15,13 @@ class Lighting {
 public:
 
     std::vector<Light> lights;
+    GLuint programID, depthProgramID;
+
+    GLuint shadowMapArray;
 
     int shadowMapWidth, shadowMapHeight;
 
-    GLuint programID, depthProgramID;
+    int maxLights = 50;
 
     bool saveDepth = true;
 
@@ -32,6 +34,20 @@ public:
         if (depthProgramID == 0) {
             std::cerr << "Failed to load depth shaders." << std::endl;
         }
+
+        glGenTextures(1, &shadowMapArray);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, maxLights, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "OpenGL error initializing texture array: " << error << std::endl;
+        }
     }
 
     void addLight(glm::vec3 position, glm::vec3 intensity, float exposure) {
@@ -40,40 +56,39 @@ public:
         light.intensity = intensity;
         light.exposure = exposure;
 
-        // Lower Light Intensity (starts off extremely high otherwise)
+        // Adjust light intensity
         for (int i = 0; i < 125; i++) light.intensity /= 1.1f;
 
-        // Create shadow texture
-        glGenTextures(1, &light.shadowTexture);
-        glBindTexture(GL_TEXTURE_2D, light.shadowTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        // Create shadow framebuffer
+        // Initialize shadow framebuffer (we're using the shared shadow map array)
         glGenFramebuffers(1, &light.shadowFBO);
         glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, light.shadowTexture, 0);
-        glDrawBuffer(GL_NONE);
-        glReadBuffer(GL_NONE);
 
-        // Check framebuffer completeness
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "Error: Shadow framebuffer is not complete!" << std::endl;
+        // Ensure that lights.size() is valid for the texture layer
+        if (lights.size() >= maxLights) {
+            std::cerr << "Error: Trying to attach a shadow map layer that exceeds the texture array size." << std::endl;
+            std::cerr << "lights.size() = " << lights.size() << std::endl;
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        else {
+            // Bind the shadow map array to the framebuffer (attach the appropriate layer)
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapArray, 0, lights.size());
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
 
+            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                std::cerr << "Error: Shadow framebuffer for light is not complete! Status: " << status << std::endl;
+            }
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
         lights.push_back(light);
     }
 
     void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Plane> planes) {
         // Perform Shadow pass
         glUseProgram(depthProgramID);
-        GLuint lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
-
-        for (int i = 0; i < lights.size(); i++) {
+        for (size_t i = 0; i < lights.size(); ++i) {
             Light light = lights[i];
 
             // Compute light space matrix
@@ -82,26 +97,27 @@ public:
             light.lightSpaceMatrix = lightProjection * lightView;
 
             glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapArray, 0, i);
+            //glViewport(0, 0, shadowMapWidth, shadowMapWidth);
             glClear(GL_DEPTH_BUFFER_BIT);
 
-            for (auto& model : models) model.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
-            for (auto& plane : planes) plane.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
+            for (auto& model : models) {
+                model.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
+            }
+            for (auto& plane : planes) {
+                plane.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
+            }
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glUseProgram(0);
 
             if (saveDepth) saveDepthTexture(light.shadowFBO, "depth" + std::to_string(i) + ".png");
         }
         saveDepth = false;
+        glUseProgram(0);
     }
 
     void prepareLighting() {
         glUseProgram(programID);
-
-        GLuint shadowMapID = glGetUniformLocation(programID, "shadowMap");
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, lights[0].shadowTexture);
-        glUniform1i(shadowMapID, 1);
 
         for (int i = 0; i < lights.size(); ++i) {
             std::string index = std::to_string(i);
@@ -112,12 +128,17 @@ public:
             glUniformMatrix4fv(glGetUniformLocation(programID, ("lightSpaceMatrices[" + index + "]").c_str()), 1, GL_FALSE, &lights[i].lightSpaceMatrix[0][0]);
         }
 
+        GLuint shadowMapArrayID = glGetUniformLocation(programID, "shadowMapArray");
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
+        glUniform1i(shadowMapArrayID, 1);
+
         glUniform1i(glGetUniformLocation(programID, "lightCount"), lights.size());
     }
 
     void cleanup() {
         for (auto& light : lights) {
-            glDeleteTextures(1, &light.shadowTexture);
+            glDeleteTextures(1, &shadowMapArray);
             glDeleteFramebuffers(1, &light.shadowFBO);
         }
     }
