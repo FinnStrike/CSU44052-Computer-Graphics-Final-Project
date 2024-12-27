@@ -21,14 +21,19 @@ public:
 
     int shadowMapWidth, shadowMapHeight;
 
-    int maxLights = 50;
+    int maxLights = 100;
 
     bool saveDepth = true;
 
-    void initialize(GLuint programID, int shadowMapWidth, int shadowMapHeight) {
-        this->programID = programID;
+    void initialize(int shadowMapWidth, int shadowMapHeight) {
         this->shadowMapWidth = shadowMapWidth;
         this->shadowMapHeight = shadowMapHeight;
+
+        programID = LoadShadersFromFile("../final/shader/model.vert", "../final/shader/model.frag");
+        if (programID == 0)
+        {
+            std::cerr << "Failed to load main shaders." << std::endl;
+        }
 
         depthProgramID = LoadShadersFromFile("../final/shader/depth.vert", "../final/shader/depth.frag");
         if (depthProgramID == 0) {
@@ -51,6 +56,13 @@ public:
     }
 
     void addLight(glm::vec3 position, glm::vec3 intensity, float exposure) {
+        // Check if light already exists
+        for (const auto& existingLight : lights) {
+            if (glm::distance(existingLight.position, position) < 0.1f) {
+                return; // Light already exists, so don't add it again
+            }
+        }
+
         Light light;
         light.position = position;
         light.intensity = intensity;
@@ -83,6 +95,22 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         lights.push_back(light);
+    }
+
+    // Remove lights that are outside the 5x5 grid centered around the camera
+    void removeLightsOutsideGrid(int centerX, int centerY, float tileSize) {
+        std::vector<Light> remainingLights;
+        for (const auto& light : lights) {
+            int lightX = static_cast<int>(round(light.position.x / tileSize));
+            int lightY = static_cast<int>(round(light.position.z / tileSize));
+
+            // Keep lights within the 5x5 grid range centered on (centerX, centerY)
+            if (abs(lightX - centerX) <= 2 && abs(lightY - centerY) <= 2) {
+                remainingLights.push_back(light);
+            }
+        }
+
+        lights = remainingLights;
     }
 
     void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Plane> planes) {

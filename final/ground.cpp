@@ -52,7 +52,7 @@ struct Plane {
 	GLuint textureSamplerID;
 	GLuint programID;
 
-	void initialize(const std::vector<glm::mat4>& instanceTransforms) {
+	void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms) {
 		// Define scale of the skybox geometry
 		this->instanceTransforms = instanceTransforms;
 
@@ -81,11 +81,7 @@ struct Plane {
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
 		// Create and compile our GLSL program from the shaders
-		programID = LoadShadersFromFile("../final/shader/model.vert", "../final/shader/model.frag");
-		if (programID == 0)
-		{
-			std::cerr << "Failed to load shaders." << std::endl;
-		}
+		this->programID = programID;
 
 		// Get a handle for our "MVP" uniforms
 		cameraMatrixID = glGetUniformLocation(programID, "camera");

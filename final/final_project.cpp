@@ -26,7 +26,7 @@ const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
 const glm::vec3 wave600(255.0f, 190.0f, 0.0f);
 const glm::vec3 wave700(205.0f, 0.0f, 0.0f);
 static glm::vec3 lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-static glm::vec3 lightPosition(0.0f, 800.0f, 0.0f);
+static glm::vec3 lightPosition(0.0f, 427.5f, 0.0f);
 static float exposure = 2.0f;
 
 // Shadow mapping
@@ -43,7 +43,7 @@ static float depthFar = 4000.0f;
 static glm::vec2 lastMousePos(windowWidth / 2.0f, windowHeight / 2.0f);
 static float sensitivity = 0.1f;
 static double edgeThreshold = 50.0; // Pixels from the edge of the screen
-static float edgeTurnSpeed = 1.0f;  // Degrees per frame (adjust as needed)
+static float edgeTurnSpeed = 3.0f;  // Degrees per frame (adjust as needed)
 static float yaw = -90.0f;
 static float pitch = 0.0f;
 
@@ -74,13 +74,34 @@ std::unordered_set<TileCoord, TileCoordHash> activeTiles;
 // Generate a tile
 void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
 	glm::mat4 g(1.0f);
-	g = glm::translate(g, glm::vec3(x * tileSize, 100.0f, y * tileSize));
+	g = glm::translate(g, glm::vec3(x * tileSize, 100, y * tileSize));
 	g = glm::scale(g, glm::vec3(tileSize, 0, tileSize));
 	gts.push_back(g);
 }
 
+void generateLamps(int x, int y, std::vector<glm::mat4>& lts) {
+	glm::mat4 l(1.0f);
+	l = glm::translate(l, glm::vec3(x * tileSize, 100, y * tileSize));
+	l = glm::scale(l, glm::vec3(100, 100, 100));
+	lts.push_back(l);
+}
+
+void generateStools(int x, int y, std::vector<glm::mat4>& sts) {
+	glm::mat4 s(1.0f);
+	s = glm::translate(s, glm::vec3(x * tileSize + 150, 100, y * tileSize + 100));
+	s = glm::scale(s, glm::vec3(100, 100, 100));
+	sts.push_back(s);
+}
+
+void generateLights(int x, int y, Lighting& lighting) {
+	glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x * tileSize, 0.0f, y * tileSize));
+	glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
+	lighting.addLight(p, lightIntensity, exposure);
+}
+
 // Update visible tiles
-void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts) {
+void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts,
+		std::vector<glm::mat4>& lts, std::vector<glm::mat4>& sts, Lighting& lighting) {
 	// Determine the center tile based on camera position
 	int centerTileX = static_cast<int>(round(cameraPos.x / tileSize));
 	int centerTileY = static_cast<int>(round(cameraPos.z / tileSize));
@@ -88,13 +109,21 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts) {
 	// Clear the current tile set
 	activeTiles.clear();
 	gts.clear();
+	lts.clear();
+	sts.clear();
+	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize);
 
 	// Generate a 3x3 grid of tiles centered on the closest tile
 	for (int x = centerTileX - 4; x <= centerTileX + 4; ++x) {
 		for (int y = centerTileY - 4; y <= centerTileY + 4; ++y) {
 			TileCoord coord{ x, y };
 			activeTiles.insert(coord); // Track the active tile
-			generateTile(x, y, gts);  // Generate the corresponding transformation
+			generateTile(x, y, gts);  // Generate the corresponding transformations
+			generateLamps(x, y, lts);
+			generateStools(x, y, sts);
+			if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
+				y >= centerTileY - 2 && y <= centerTileY + 2)
+				generateLights(x, y, lighting);
 		}
 	}
 }
@@ -150,67 +179,21 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
-	// Create the ground
-	std::vector<glm::mat4> gts;
-	updateTiles(camera.position, gts);
+	// Create the Scene
+	std::vector<glm::mat4> gts, lts, sts;
+	Lighting lighting;
+	lighting.initialize(shadowMapWidth, shadowMapHeight);
+	updateTiles(camera.position, gts, lts, sts, lighting);
 	Plane ground;
-	ground.initialize(gts);
+	ground.initialize(lighting.programID, gts);
+	StaticModel lamp;
+	lamp.initialize(lighting.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
+	StaticModel stool;
+	stool.initialize(lighting.programID, sts, "../final/model/stool/folding_wooden_stool_1k.gltf");
 
 	// Our 3D character
 	//MyBot bot;
 	//bot.initialize(lightPosition, lightIntensity);
-
-	std::vector<glm::mat4> lts;
-	//glm::mat4 lt(1.0f);
-	//lt = glm::translate(lt, glm::vec3(-275.0f, 100.0f, 0.0f));
-	//lt = glm::scale(lt, glm::vec3(100.0f, 100.0f, 100.0f));
-	//lts.push_back(lt);
-
-	for (int i = -1; i <= 1; i++) {
-		for (int j = -1; j <= 1; j++) {
-			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3(i * tileSize, 100.0f, j * tileSize));
-			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
-			lts.push_back(g);
-		}
-	}
-
-	// A Street Lamp
-	StaticModel lamp;
-	lamp.initialize(ground.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
-
-	std::vector<glm::mat4> sts;
-	//glm::mat4 st(1.0f);
-	//st = glm::translate(st, glm::vec3(-125.0f, 100.0f, 100.0f));
-	//st = glm::scale(st, glm::vec3(100.0f, 100.0f, 100.0f));
-	//sts.push_back(st);
-
-	for (int i = -1; i <= 1; i++) {
-		for (int j = -1; j <= 1; j++) {
-			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3(i * tileSize + 150.0f, 100.0f, 100.0f + j * tileSize));
-			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
-			sts.push_back(g);
-		}
-	}
-
-	// A Folding Stool
-	StaticModel stool;
-	stool.initialize(ground.programID, sts, "../final/model/stool/folding_wooden_stool_1k.gltf");
-
-	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 427.5f, 0.0f));
-	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-
-	Lighting lighting;
-	lighting.initialize(ground.programID, shadowMapWidth, shadowMapHeight);
-	//lighting.addLight(lightPosition, lightIntensity, exposure);
-	for (int i = -1; i <= 1; i++) {
-		for (int j = -1; j <= 1; j++) {
-			glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(i * tileSize, 0.0f, j * tileSize));
-			glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
-			lighting.addLight(p, lightIntensity, exposure);
-		}
-	}
 
 	std::vector<StaticModel> models;
 	models.push_back(stool);
@@ -262,17 +245,21 @@ int main(void)
 		// Update camera's lookAt
 		camera.updateLookAt(cameraFront);
 
-		// Update ground tiles
+		// Update tiles
 		glm::vec3 cameraPos = camera.position;
-		updateTiles(cameraPos, gts);
+		updateTiles(cameraPos, gts, lts, sts, lighting);
 		ground.updateInstances(gts);
+		lamp.updateInstanceMatrices(lts);
+		stool.updateInstanceMatrices(sts);
+		models.clear();
+		models.push_back(stool);
 
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
 		glm::mat4 vp = projectionMatrix * viewMatrix;
+
 		// Render the scene
 		//bot.render(vp);
-
 		lighting.performShadowPass(lightProjection, models, planes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		//glViewport(0, 0, windowWidth, windowHeight);
