@@ -57,7 +57,7 @@ void main()
             }
             else {
                 vec3 coord = vec3(1-lightCoords.x, lightCoords.z, i);
-                float closestDepth = pow(texture(shadowMapArray, coord).r, 20);
+                float closestDepth = pow(texture(shadowMapArray, coord).r, 50);
                 shadow = lightCoords.z >= closestDepth ? 0.2 : 1.0;
                 //float bias = 0; //max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
                 //vec2 texelSize = 1.0 / textureSize(shadowMapArray, 0).xz;

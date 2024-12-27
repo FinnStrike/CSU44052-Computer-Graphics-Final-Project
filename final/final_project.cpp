@@ -26,7 +26,7 @@ const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
 const glm::vec3 wave600(255.0f, 190.0f, 0.0f);
 const glm::vec3 wave700(205.0f, 0.0f, 0.0f);
 static glm::vec3 lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-static glm::vec3 lightPosition(0.0f, 427.5f, 0.0f);
+static glm::vec3 lightPosition(0.0f, 527.5f, 0.0f);
 static float exposure = 2.0f;
 
 // Shadow mapping
