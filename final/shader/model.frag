@@ -45,32 +45,34 @@ void main()
             float diff = max(dot(normal, lightDirection), 0.0);
             vec3 diffuse = diff * lightIntensities[i] * attenuation;
 
-            vec4 fragPosLightSpace = lightSpaceMatrices[i] * vec4(worldPosition, 1.0);
-            vec3 lightCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-            lightCoords = lightCoords * 0.5 + 0.5;
+            // If the fragment is too far from the light source, skip the shadow logic
+            if (distance <= FOG_MIN_DIST/2) {
+                vec4 fragPosLightSpace = lightSpaceMatrices[i] * vec4(worldPosition, 1.0);
+                vec3 lightCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+                lightCoords = lightCoords * 0.5 + 0.5;
 
-            float shadow;
-            if (lightCoords.x < 0.0 || lightCoords.x > 1.0 ||
-                lightCoords.z < 0.0 || lightCoords.z > 1.0 ||
-                lightCoords.y > 1.0) {
-                shadow = 1.0;
+                float shadow;
+                if (lightCoords.x < 0.0 || lightCoords.x > 1.0 ||
+                    lightCoords.z < 0.0 || lightCoords.z > 1.0 ||
+                    lightCoords.y > 1.0) {
+                    shadow = 1.0;
+                }
+                else {
+                    vec3 coord = vec3(1-lightCoords.x * 1.003, lightCoords.z * 1.022, i);
+                    float closestDepth = pow(texture(shadowMapArray, coord).r, 50);
+                    float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
+                    shadow = lightCoords.z - bias >= closestDepth ? 0.2 : 1.0;
+                    //vec2 texelSize = 1.0 / textureSize(shadowMapArray, 0).xz;
+                    //for (int x = -1; x <= 1; ++x) {
+                    //    for (int y = -1; y <= 1; ++y) {
+                    //        float pcfDepth = pow(texture(shadowMapArray, vec3(coord.xy + vec2(x, y) * texelSize, i)).r, 50);
+                    //        shadow += lightCoords.z - bias >= pcfDepth ? 0.2 : 1.0;
+                    //    }
+                    //}
+                    //shadow /= 9.0;
+                }
+                diffuse *= shadow;
             }
-            else {
-                vec3 coord = vec3(1-lightCoords.x, lightCoords.z, i);
-                float closestDepth = pow(texture(shadowMapArray, coord).r, 50);
-                shadow = lightCoords.z >= closestDepth ? 0.2 : 1.0;
-                //float bias = 0; //max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
-                //vec2 texelSize = 1.0 / textureSize(shadowMapArray, 0).xz;
-                //for (int x = -1; x <= 1; ++x) {
-                //    for (int y = -1; y <= 1; ++y) {
-                //        float pcfDepth = texture(shadowMapArray, vec3(lightCoords.xz + vec2(x, y) * texelSize, i)).r;
-                //        shadow += lightCoords.z - bias >= pcfDepth ? 0.2 : 1.0;
-                //    }
-                //}
-                //shadow /= 9.0;
-            }
-
-            diffuse *= shadow;
             finalLighting += diffuse * lightExposures[i];
         }
 

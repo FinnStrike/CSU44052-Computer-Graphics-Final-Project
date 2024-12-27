@@ -30,8 +30,8 @@ static float exposure = 2.0f;
 
 // Shadow mapping
 static glm::vec3 lightUp(0, 0, 1);
-static int shadowMapWidth = 2048;
-static int shadowMapHeight = 2048;
+static int shadowMapWidth = 1024;
+static int shadowMapHeight = 1024;
 
 // DONE: set these parameters 
 static float depthFoV = 120.0f;
@@ -80,8 +80,8 @@ void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
 
 void generateCubes(int x, int y, std::vector<glm::mat4>& cts) {
 	glm::mat4 c(1.0f);
-	c = glm::translate(c, glm::vec3(x * tileSize + tileSize / 2, 100, y * tileSize + tileSize / 2));
-	c = glm::scale(c, glm::vec3(400, 4000, 400));
+	c = glm::translate(c, glm::vec3(x, 100, y));
+	c = glm::scale(c, glm::vec3(300, 3000, 300));
 	cts.push_back(c);
 }
 
@@ -126,12 +126,26 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts, std::v
 			TileCoord coord{ x, y };
 			activeTiles.insert(coord); // Track the active tile
 			generateTile(x, y, gts);  // Generate the corresponding transformations
-			generateCubes(x, y, cts);
-			generateLamps(x, y, lts);
-			generateStools(x, y, sts);
-			if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
-				y >= centerTileY - 2 && y <= centerTileY + 2)
-				generateLights(x, y, lighting);
+
+			int modX = ((x - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
+			int modY = ((y - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
+
+			if (modX == 1 && modY == 1) {
+				// CENTER TILE: Generate lamp and stool
+				generateLamps(x, y, lts);
+				generateStools(x, y, sts);
+				if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
+					y >= centerTileY - 2 && y <= centerTileY + 2)
+					generateLights(x, y, lighting);
+			}
+			else if (modX == modY || modX + modY == 2) {
+				// DIAGONAL AXES: Generate a group of buildings
+				for (int i = -1; i <= 1; ++i) {
+					for (int j = -1; j <= 1; ++j) {
+						generateCubes(x * tileSize + i * 500, y * tileSize + j * 500, cts);
+					}
+				}
+			}   // X AND Y AXES: Empty
 		}
 	}
 }
