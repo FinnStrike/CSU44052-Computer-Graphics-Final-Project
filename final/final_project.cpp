@@ -81,7 +81,7 @@ void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
 void generateCubes(int x, int y, std::vector<glm::mat4>& cts) {
 	glm::mat4 c(1.0f);
 	c = glm::translate(c, glm::vec3(x * tileSize + tileSize / 2, 100, y * tileSize + tileSize / 2));
-	c = glm::scale(c, glm::vec3(100, 100, 100));
+	c = glm::scale(c, glm::vec3(400, 4000, 400));
 	cts.push_back(c);
 }
 

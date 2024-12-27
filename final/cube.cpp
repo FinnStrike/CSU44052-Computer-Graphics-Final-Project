@@ -179,6 +179,7 @@ struct Cube {
 		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
 
 		// Create a vertex buffer object to store the UV data
+		for (int i = 0; i < 24; ++i) uv_buffer_data[2 * i + 1] *= 10;
 		glGenBuffers(1, &uvBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data), uv_buffer_data, GL_STATIC_DRAW);
