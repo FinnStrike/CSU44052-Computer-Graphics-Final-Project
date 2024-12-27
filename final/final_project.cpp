@@ -3,7 +3,6 @@
 #include <camera.cpp>
 #include <skybox.cpp>
 #include <bot.cpp>
-#include <geometry.cpp>
 #include <lighting.cpp>
 
 static GLFWwindow* window;
@@ -79,6 +78,13 @@ void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
 	gts.push_back(g);
 }
 
+void generateCubes(int x, int y, std::vector<glm::mat4>& cts) {
+	glm::mat4 c(1.0f);
+	c = glm::translate(c, glm::vec3(x * tileSize + tileSize / 2, 100, y * tileSize + tileSize / 2));
+	c = glm::scale(c, glm::vec3(100, 100, 100));
+	cts.push_back(c);
+}
+
 void generateLamps(int x, int y, std::vector<glm::mat4>& lts) {
 	glm::mat4 l(1.0f);
 	l = glm::translate(l, glm::vec3(x * tileSize, 100, y * tileSize));
@@ -100,7 +106,7 @@ void generateLights(int x, int y, Lighting& lighting) {
 }
 
 // Update visible tiles
-void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts,
+void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts, std::vector<glm::mat4>& cts,
 		std::vector<glm::mat4>& lts, std::vector<glm::mat4>& sts, Lighting& lighting) {
 	// Determine the center tile based on camera position
 	int centerTileX = static_cast<int>(round(cameraPos.x / tileSize));
@@ -109,6 +115,7 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts,
 	// Clear the current tile set
 	activeTiles.clear();
 	gts.clear();
+	cts.clear();
 	lts.clear();
 	sts.clear();
 	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize);
@@ -119,6 +126,7 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts,
 			TileCoord coord{ x, y };
 			activeTiles.insert(coord); // Track the active tile
 			generateTile(x, y, gts);  // Generate the corresponding transformations
+			generateCubes(x, y, cts);
 			generateLamps(x, y, lts);
 			generateStools(x, y, sts);
 			if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
@@ -180,12 +188,14 @@ int main(void)
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
 	// Create the Scene
-	std::vector<glm::mat4> gts, lts, sts;
+	std::vector<glm::mat4> gts, lts, sts, cts;
 	Lighting lighting;
 	lighting.initialize(shadowMapWidth, shadowMapHeight);
-	updateTiles(camera.position, gts, lts, sts, lighting);
+	updateTiles(camera.position, gts, cts, lts, sts, lighting);
 	Plane ground;
 	ground.initialize(lighting.programID, gts);
+	Cube building;
+	building.initialize(lighting.programID, cts);
 	StaticModel lamp;
 	lamp.initialize(lighting.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
 	StaticModel stool;
@@ -199,8 +209,8 @@ int main(void)
 	models.push_back(stool);
 	//models.push_back(lamp);
 
-	std::vector<Plane> planes;
-	//planes.push_back(ground);
+	std::vector<Cube> cubes;
+	cubes.push_back(building);
 
 	// Camera setup
 	glm::mat4 viewMatrix, projectionMatrix, lightProjection;
@@ -247,12 +257,15 @@ int main(void)
 
 		// Update tiles
 		glm::vec3 cameraPos = camera.position;
-		updateTiles(cameraPos, gts, lts, sts, lighting);
+		updateTiles(cameraPos, gts, cts, lts, sts, lighting);
 		ground.updateInstances(gts);
+		building.updateInstances(cts);
 		lamp.updateInstanceMatrices(lts);
 		stool.updateInstanceMatrices(sts);
 		models.clear();
 		models.push_back(stool);
+		cubes.clear();
+		cubes.push_back(building);
 
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
@@ -260,13 +273,14 @@ int main(void)
 
 		// Render the scene
 		//bot.render(vp);
-		lighting.performShadowPass(lightProjection, models, planes);
+		lighting.performShadowPass(lightProjection, models, cubes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		//glViewport(0, 0, windowWidth, windowHeight);
 		sky.updatePosition(cameraPos);
 		sky.render(vp);
 		lighting.prepareLighting(cameraPos);
 		ground.render(vp);
+		building.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
 
@@ -295,6 +309,8 @@ int main(void)
 	sky.cleanup();
 	//bot.cleanup();
 	ground.cleanup();
+	building.cleanup();
+	lighting.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();

@@ -1,6 +1,7 @@
 #include <render/shader.h>
 #include <render/texture.h>
 #include <model.cpp>
+#include <cube.cpp>
 #include <ground.cpp>
 
 struct Light {
@@ -113,7 +114,7 @@ public:
         lights = remainingLights;
     }
 
-    void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Plane> planes) {
+    void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Cube> cubes) {
         // Perform Shadow pass
         glUseProgram(depthProgramID);
         for (size_t i = 0; i < lights.size(); ++i) {
@@ -132,8 +133,8 @@ public:
             for (auto& model : models) {
                 model.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
             }
-            for (auto& plane : planes) {
-                plane.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
+            for (auto& cube : cubes) {
+                cube.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
