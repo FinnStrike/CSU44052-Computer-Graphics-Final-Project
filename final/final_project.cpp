@@ -14,8 +14,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 static void cursor_callback(GLFWwindow* window, double xpos, double ypos);
 
 // OpenGL camera view parameters
-static glm::vec3 eye_center(-278.0f, 273.0f, 800.0f);
-static glm::vec3 lookat(-278.0f, 273.0f, 0.0f);
+static glm::vec3 eye_center(0.0f, 273.0f, 0.0f);
+static glm::vec3 lookat(0.0f, 273.0f, -800.0f);
 static glm::vec3 up(0.0f, 1.0f, 0.0f);
 static float FoV = 45.0f;
 static float zNear = 10.0f;
@@ -26,7 +26,7 @@ const glm::vec3 wave500(0.0f, 255.0f, 146.0f);
 const glm::vec3 wave600(255.0f, 190.0f, 0.0f);
 const glm::vec3 wave700(205.0f, 0.0f, 0.0f);
 static glm::vec3 lightIntensity = 5.0f * (8.0f * wave500 + 15.6f * wave600 + 18.4f * wave700);
-static glm::vec3 lightPosition(-275.0f, 800.0f, -275.0f);
+static glm::vec3 lightPosition(0.0f, 800.0f, 0.0f);
 static float exposure = 2.0f;
 
 // Shadow mapping
@@ -47,12 +47,57 @@ static float edgeTurnSpeed = 1.0f;  // Degrees per frame (adjust as needed)
 static float yaw = -90.0f;
 static float pitch = 0.0f;
 
+// Terrain
+const float tileSize = 1024;
+
 // Animation 
 static bool playAnimation = true;
 static float playbackSpeed = 2.0f;
 
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
+
+// Utility to hash tile coordinates for std::unordered_set
+struct TileCoord {
+	int x, y;
+	bool operator==(const TileCoord& other) const { return x == other.x && y == other.y; }
+};
+
+struct TileCoordHash {
+	std::size_t operator()(const TileCoord& coord) const {
+		return std::hash<int>()(coord.x) ^ std::hash<int>()(coord.y);
+	}
+};
+
+std::unordered_set<TileCoord, TileCoordHash> activeTiles;
+
+// Generate a tile
+void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
+	glm::mat4 g(1.0f);
+	g = glm::translate(g, glm::vec3(x * tileSize, 100.0f, y * tileSize));
+	g = glm::scale(g, glm::vec3(tileSize, 0, tileSize));
+	gts.push_back(g);
+}
+
+// Update visible tiles
+void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts) {
+	// Determine the center tile based on camera position
+	int centerTileX = static_cast<int>(round(cameraPos.x / tileSize));
+	int centerTileY = static_cast<int>(round(cameraPos.z / tileSize));
+
+	// Clear the current tile set
+	activeTiles.clear();
+	gts.clear();
+
+	// Generate a 3x3 grid of tiles centered on the closest tile
+	for (int x = centerTileX - 4; x <= centerTileX + 4; ++x) {
+		for (int y = centerTileY - 4; y <= centerTileY + 4; ++y) {
+			TileCoord coord{ x, y };
+			activeTiles.insert(coord); // Track the active tile
+			generateTile(x, y, gts);  // Generate the corresponding transformation
+		}
+	}
+}
 
 int main(void)
 {
@@ -105,22 +150,9 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
-	std::vector<glm::mat4> gts;
-	glm::mat4 gt(1.0f);
-	gt = glm::translate(gt, glm::vec3(-275.0f, 100.0f, 0.0f));
-	gt = glm::scale(gt, glm::vec3(1024, 0, 1024));
-	gts.push_back(gt);
-
-	for (int i = -1; i <= 1; i++) {
-		for (int j = -1; j <= 1; j++) {
-			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((i * 1024.0f) - 275.0f, 100.0f, 0.0f + (j * 1024.0f)));
-			g = glm::scale(g, glm::vec3(1024, 0, 1024));
-			gts.push_back(g);
-		}
-	}
-
 	// Create the ground
+	std::vector<glm::mat4> gts;
+	updateTiles(camera.position, gts);
 	Plane ground;
 	ground.initialize(gts);
 
@@ -129,15 +161,15 @@ int main(void)
 	//bot.initialize(lightPosition, lightIntensity);
 
 	std::vector<glm::mat4> lts;
-	glm::mat4 lt(1.0f);
-	lt = glm::translate(lt, glm::vec3(-275.0f, 100.0f, 0.0f));
-	lt = glm::scale(lt, glm::vec3(100.0f, 100.0f, 100.0f));
-	lts.push_back(lt);
+	//glm::mat4 lt(1.0f);
+	//lt = glm::translate(lt, glm::vec3(-275.0f, 100.0f, 0.0f));
+	//lt = glm::scale(lt, glm::vec3(100.0f, 100.0f, 100.0f));
+	//lts.push_back(lt);
 
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((i * 1024.0f) - 275.0f, 100.0f, 0.0f + (j * 1024.0f)));
+			g = glm::translate(g, glm::vec3(i * tileSize, 100.0f, j * tileSize));
 			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
 			lts.push_back(g);
 		}
@@ -148,15 +180,15 @@ int main(void)
 	lamp.initialize(ground.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
 
 	std::vector<glm::mat4> sts;
-	glm::mat4 st(1.0f);
-	st = glm::translate(st, glm::vec3(-125.0f, 100.0f, 100.0f));
-	st = glm::scale(st, glm::vec3(100.0f, 100.0f, 100.0f));
-	sts.push_back(st);
+	//glm::mat4 st(1.0f);
+	//st = glm::translate(st, glm::vec3(-125.0f, 100.0f, 100.0f));
+	//st = glm::scale(st, glm::vec3(100.0f, 100.0f, 100.0f));
+	//sts.push_back(st);
 
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
 			glm::mat4 g(1.0f);
-			g = glm::translate(g, glm::vec3((i * 1024.0f) - 125.0f, 100.0f, 100.0f + (j * 1024.0f)));
+			g = glm::translate(g, glm::vec3(i * tileSize + 150.0f, 100.0f, 100.0f + j * tileSize));
 			g = glm::scale(g, glm::vec3(100.0f, 100.0f, 100.0f));
 			sts.push_back(g);
 		}
@@ -166,7 +198,7 @@ int main(void)
 	StaticModel stool;
 	stool.initialize(ground.programID, sts, "../final/model/stool/folding_wooden_stool_1k.gltf");
 
-	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(-275.0f, 427.5f, 0.0f));
+	glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 427.5f, 0.0f));
 	lightPosition = glm::vec3(trans * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 	Lighting lighting;
@@ -174,7 +206,7 @@ int main(void)
 	//lighting.addLight(lightPosition, lightIntensity, exposure);
 	for (int i = -1; i <= 1; i++) {
 		for (int j = -1; j <= 1; j++) {
-			glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(i * 1024.0f, 0.0f, j * 1024.0f));
+			glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(i * tileSize, 0.0f, j * tileSize));
 			glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
 			lighting.addLight(p, lightIntensity, exposure);
 		}
@@ -230,6 +262,11 @@ int main(void)
 		// Update camera's lookAt
 		camera.updateLookAt(cameraFront);
 
+		// Update ground tiles
+		glm::vec3 cameraPos = camera.position;
+		updateTiles(cameraPos, gts);
+		ground.updateInstances(gts);
+
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
 		glm::mat4 vp = projectionMatrix * viewMatrix;
@@ -244,6 +281,7 @@ int main(void)
 		stool.render(vp);
 		lamp.render(vp);
 
+		sky.updatePosition(cameraPos);
 		sky.render(vp);
 
 		// FPS tracking 

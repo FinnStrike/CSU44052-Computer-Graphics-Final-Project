@@ -110,6 +110,22 @@ struct Plane {
 		}
 	}
 
+	void updateInstances(const std::vector<glm::mat4>& instanceTransforms) {
+		glBindBuffer(GL_ARRAY_BUFFER, instanceBufferID);
+
+		// Check if the data size has changed
+		static size_t currentBufferSize = 0;
+		size_t newSize = instanceTransforms.size() * sizeof(glm::mat4);
+		if (newSize > currentBufferSize) {
+			// Reallocate buffer if needed
+			glBufferData(GL_ARRAY_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
+			currentBufferSize = newSize;
+		}
+
+		// Update the buffer content
+		glBufferSubData(GL_ARRAY_BUFFER, 0, newSize, instanceTransforms.data());
+	}
+
 	void render(glm::mat4 cameraMatrix) {
 		glUseProgram(programID);
 

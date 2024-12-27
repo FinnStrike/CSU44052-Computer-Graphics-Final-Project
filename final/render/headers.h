@@ -9,6 +9,7 @@
 #include <stb/stb_image.h>
 #include <tiny_gltf.h>
 
+#include <unordered_set>
 #include <vector>
 #include <iostream>
 #include <iomanip>

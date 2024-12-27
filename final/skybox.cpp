@@ -201,7 +201,7 @@ struct Skybox {
 	}
 
 	void updatePosition(glm::vec3 position) {
-		this->position = position;
+		this->position = glm::vec3(position.x, this->position.y, position.z);
 	}
 
 	void render(glm::mat4 cameraMatrix) {

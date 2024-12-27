@@ -161,6 +161,26 @@ struct StaticModel {
         primitiveObject.instanceCount = instanceTransforms.size();
     }
 
+    void updateInstanceMatrices(const std::vector<glm::mat4>& newInstanceMatrices) {
+        for (auto& primitive : primitiveObjects) {
+            glBindBuffer(GL_ARRAY_BUFFER, primitive.instanceVBO);
+
+            // Update instance matrices data
+            if (newInstanceMatrices.size() <= primitive.instanceCount) {
+                // Update the existing buffer
+                glBufferSubData(GL_ARRAY_BUFFER, 0, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data());
+            }
+            else {
+                // Reallocate the buffer if the size increases
+                glBufferData(GL_ARRAY_BUFFER, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data(), GL_DYNAMIC_DRAW);
+            }
+
+            // Update instance count
+            primitive.instanceCount = newInstanceMatrices.size();
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+    }
+
     void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
         tinygltf::Model& model,
         tinygltf::Mesh& mesh) {
