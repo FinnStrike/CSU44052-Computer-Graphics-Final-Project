@@ -3,6 +3,7 @@
 #include <camera.cpp>
 #include <skybox.cpp>
 #include <bot.cpp>
+#include <particles.cpp>
 #include <lighting.cpp>
 
 static GLFWwindow* window;
@@ -226,6 +227,10 @@ int main(void)
 	std::vector<Cube> cubes;
 	cubes.push_back(building);
 
+	// Create a particle system
+	ParticleSystem particleSystem;
+	particleSystem.initialize();
+
 	// Camera setup
 	glm::mat4 viewMatrix, projectionMatrix, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
@@ -297,6 +302,7 @@ int main(void)
 		building.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
+		particleSystem.render(vp);
 
 		// FPS tracking 
 		// Count number of frames over a few seconds and take average
@@ -325,6 +331,7 @@ int main(void)
 	ground.cleanup();
 	building.cleanup();
 	lighting.cleanup();
+	particleSystem.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
