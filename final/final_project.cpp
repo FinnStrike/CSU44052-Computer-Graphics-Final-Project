@@ -2,7 +2,7 @@
 #include <render/texture.h>
 #include <camera.cpp>
 #include <skybox.cpp>
-#include <bot.cpp>
+#include <animation.cpp>
 #include <lighting.cpp>
 
 static GLFWwindow* window;
@@ -124,6 +124,12 @@ void generateBots(int x, int y, std::vector<glm::mat4>& bts) {
 	bts.push_back(b);
 }
 
+void generateFoxes(int x, int y, std::vector<glm::mat4>& fts, float time) {
+	glm::mat4 f(1.0f);
+	f = glm::translate(f, glm::vec3((x * tileSize) - (tileSize * 1.25f) + 10, 100, std::fmod(time * 128.0f, tileSize * 3.0f) + (y * tileSize)));
+	fts.push_back(f);
+}
+
 void generateLights(int x, int y, Lighting& lighting) {
 	glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x * tileSize, 0.0f, y * tileSize));
 	glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
@@ -132,7 +138,7 @@ void generateLights(int x, int y, Lighting& lighting) {
 
 // Update visible tiles
 void updateTiles(const glm::vec3& cameraPos, std::vector<std::vector<glm::mat4>>& transformVectors, 
-	Lighting& lighting, std::vector<int>& buildingIndices) {
+	Lighting& lighting, std::vector<int>& buildingIndices, float time) {
 	// Determine the center tile based on camera position
 	int centerTileX = static_cast<int>(round(cameraPos.x / tileSize));
 	int centerTileY = static_cast<int>(round(cameraPos.z / tileSize));
@@ -153,10 +159,11 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<std::vector<glm::mat4>>
 			int modY = ((y - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
 
 			if (modX == 1 && modY == 1) {
-				// CENTER TILE: Generate lamp, stool and bot
+				// CENTER TILE: Generate lamp, stool and animations
 				generateLamps(x, y, transformVectors[1]);
 				generateStools(x, y, transformVectors[2]);
 				generateBots(x, y, transformVectors[7]);
+				generateFoxes(x, y, transformVectors[8], time);
 				if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
 					y >= centerTileY - 2 && y <= centerTileY + 2)
 					generateLights(x, y, lighting);
@@ -231,13 +238,13 @@ int main(void)
 
 	// Create the Scene
 	std::vector<std::vector<glm::mat4>> transformVectors;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 9; i++) {
 		std::vector<glm::mat4> transforms;
 		transformVectors.push_back(transforms);
 	}
 	Lighting lighting;
 	lighting.initialize(shadowMapWidth, shadowMapHeight);
-	updateTiles(camera.position, transformVectors, lighting, buildingIndices);
+	updateTiles(camera.position, transformVectors, lighting, buildingIndices, 0);
 	Plane ground;
 	ground.initialize(lighting.programID, transformVectors[0]);
 	StaticModel lamp;
@@ -252,8 +259,11 @@ int main(void)
 	technoBuilding.initialize(lighting.programID, transformVectors[5], 3, 12, "../final/assets/facade1.png");
 	Cube steampunkBuilding;
 	steampunkBuilding.initialize(lighting.programID, transformVectors[6], 4, 8, "../final/assets/facade7.png");
-	MyBot bot;
-	bot.initialize(transformVectors[7]);
+	AnimatedModel bot;
+	bot.initialize(transformVectors[7], "../final/model/bot/bot.gltf");
+	AnimatedModel fox;
+	fox.initialize(transformVectors[8], "../final/model/fox/fox.gltf");
+
 
 	std::vector<StaticModel> models;
 	models.push_back(stool);
@@ -272,7 +282,8 @@ int main(void)
 
 	// Time and frame rate tracking
 	static double lastTime = glfwGetTime();
-	float time = 0.0f;			// Animation time 
+	float botTime = 0.0f;			// Animation time 
+	float foxTime = 0.0f;			// Animation time 
 	float fTime = 0.0f;			// Time for measuring fps
 	unsigned long frames = 0;
 
@@ -286,8 +297,10 @@ int main(void)
 		lastTime = currentTime;
 
 		if (playAnimation) {
-			time += deltaTime * playbackSpeed;
-			bot.update(time);
+			botTime += deltaTime * playbackSpeed;
+			bot.update(botTime);
+			foxTime += deltaTime * playbackSpeed / 1.5;
+			fox.update(foxTime);
 		}
 
 		// Check for edge turning
@@ -310,7 +323,7 @@ int main(void)
 
 		// Update tiles
 		glm::vec3 cameraPos = camera.position;
-		updateTiles(camera.position, transformVectors, lighting, buildingIndices);
+		updateTiles(camera.position, transformVectors, lighting, buildingIndices, foxTime);
 		ground.updateInstances(transformVectors[0]);
 		lamp.updateInstanceMatrices(transformVectors[1]);
 		stool.updateInstanceMatrices(transformVectors[2]);
@@ -319,6 +332,7 @@ int main(void)
 		technoBuilding.updateInstances(transformVectors[5]);
 		steampunkBuilding.updateInstances(transformVectors[6]);
 		bot.updateInstanceMatrices(transformVectors[7]);
+		fox.updateInstanceMatrices(transformVectors[8]);
 		models.clear();
 		models.push_back(stool);
 		cubes.clear();
@@ -344,6 +358,7 @@ int main(void)
 		stool.render(vp);
 		lamp.render(vp);
 		bot.render(vp, cameraPos);
+		fox.render(vp, cameraPos);
 		for (auto& particleSystem : particleSystems) particleSystem.render(vp, cameraPos);
 
 		// FPS tracking 
@@ -370,6 +385,7 @@ int main(void)
 	// Clean up
 	sky.cleanup();
 	bot.cleanup();
+	fox.cleanup();
 	ground.cleanup();
 	for (auto& cube : cubes) cube.cleanup();
 	lighting.cleanup();

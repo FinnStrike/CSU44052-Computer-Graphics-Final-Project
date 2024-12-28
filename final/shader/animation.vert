@@ -16,6 +16,7 @@ layout(location = 5) in mat4 instanceMatrix;
 out vec3 worldPosition;
 out vec3 worldNormal;
 out mat4 modelMatrix;
+out vec2 uv;
 
 uniform mat4 MVP;
 uniform mat4 jointMatrices[25];
@@ -36,4 +37,5 @@ void main() {
     mat3 skinRotation = mat3(skinMatrix);
     worldNormal = normalize(skinRotation * vertexNormal);
     modelMatrix = instanceMatrix;
+    uv = vertexUV;
 }

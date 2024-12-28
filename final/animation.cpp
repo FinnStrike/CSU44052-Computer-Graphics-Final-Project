@@ -5,12 +5,13 @@
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 #endif
 
-struct MyBot {
+struct AnimatedModel {
 	// Shader variable IDs
 	GLuint mvpMatrixID;
 	GLuint jointMatricesID;
 	GLuint lightPositionID;
 	GLuint lightIntensityID;
+	GLuint textureSamplerID;
 	GLuint programID;
 
 	glm::vec3 lightIntensity;
@@ -24,6 +25,7 @@ struct MyBot {
 	struct PrimitiveObject {
 		GLuint vao;
 		std::map<int, GLuint> vbos;
+		GLuint textureID;
 		GLuint instanceVBO;
 		int instanceCount;
 	};
@@ -403,15 +405,45 @@ struct MyBot {
 		return res;
 	}
 
-	void initialize(const std::vector<glm::mat4>& instanceTransforms) {
+	std::vector<GLuint> loadTextures(const tinygltf::Model& model) {
+		std::vector<GLuint> textureIDs(model.textures.size(), 0);
+
+		for (size_t i = 0; i < model.textures.size(); ++i) {
+			const tinygltf::Texture& texture = model.textures[i];
+			const tinygltf::Image& image = model.images[texture.source];
+
+			GLuint texID;
+			glGenTextures(1, &texID);
+			glBindTexture(GL_TEXTURE_2D, texID);
+
+			// Upload texture data to OpenGL
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0,
+				GL_RGBA, GL_UNSIGNED_BYTE, image.image.data());
+
+			// Set texture parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			glGenerateMipmap(GL_TEXTURE_2D);
+
+			textureIDs[i] = texID;
+			glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+		}
+
+		return textureIDs;
+	}
+
+	void initialize(const std::vector<glm::mat4>& instanceTransforms, const char * filepath) {
 		this->lightPosition = glm::vec3(0.0f, 527.5f, 0.0f);
 		glm::vec3 wave500(0.0f, 255.0f, 146.0f);
 		glm::vec3 wave600(255.0f, 190.0f, 0.0f);
 		glm::vec3 wave700(205.0f, 0.0f, 0.0f);
-		this->lightIntensity = 5.0f * (12.0f * wave500 + 12.0f * wave600 + 10.0f * wave700);
+		this->lightIntensity = 5.0f * (10.0f * wave500 + 10.0f * wave600 + 10.0f * wave700);
 
 		// Modify your path if needed
-		if (!loadModel(model, "../final/model/bot/bot.gltf")) {
+		if (!loadModel(model, filepath)) {
 			return;
 		}
 
@@ -430,7 +462,7 @@ struct MyBot {
 		animationObjects = prepareAnimation(model);
 
 		// Create and compile our GLSL program from the shaders
-		programID = LoadShadersFromFile("../final/shader/bot.vert", "../final/shader/bot.frag");
+		programID = LoadShadersFromFile("../final/shader/animation.vert", "../final/shader/animation.frag");
 		if (programID == 0)
 		{
 			std::cerr << "Failed to load shaders." << std::endl;
@@ -441,6 +473,7 @@ struct MyBot {
 		jointMatricesID = glGetUniformLocation(programID, "jointMatrices");
 		lightPositionID = glGetUniformLocation(programID, "lightPosition");
 		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
+		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
 	}
 
 	void setupInstanceBuffer(PrimitiveObject& primitiveObject, const std::vector<glm::mat4>& instanceTransforms) {
@@ -483,7 +516,8 @@ struct MyBot {
 	}
 
 	void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
-		tinygltf::Model& model, tinygltf::Mesh& mesh) {
+		tinygltf::Model& model, tinygltf::Mesh& mesh,
+		const std::vector<GLuint>& textureIDs) {
 
 		std::map<int, GLuint> vbos;
 		for (size_t i = 0; i < model.bufferViews.size(); ++i) {
@@ -492,10 +526,7 @@ struct MyBot {
 			int target = bufferView.target;
 
 			if (bufferView.target == 0) {
-				// The bufferView with target == 0 in our model refers to 
-				// the skinning weights, for 25 joints, each 4x4 matrix (16 floats), totaling to 400 floats or 1600 bytes. 
-				// So it is considered safe to skip the warning.
-				//std::cout << "WARN: bufferView.target is zero" << std::endl;
+				// Skip bufferViews with target == 0
 				continue;
 			}
 
@@ -509,10 +540,7 @@ struct MyBot {
 			vbos[i] = vbo;
 		}
 
-		// Each mesh can contain several primitives (or parts), each we need to 
-		// bind to an OpenGL vertex array object
 		for (size_t i = 0; i < mesh.primitives.size(); ++i) {
-
 			tinygltf::Primitive primitive = mesh.primitives[i];
 			tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
 
@@ -522,36 +550,41 @@ struct MyBot {
 
 			for (auto& attrib : primitive.attributes) {
 				tinygltf::Accessor accessor = model.accessors[attrib.second];
-				int byteStride =
-					accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+				int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
 				glBindBuffer(GL_ARRAY_BUFFER, vbos[accessor.bufferView]);
 
-				int size = 1;
-				if (accessor.type != TINYGLTF_TYPE_SCALAR) {
-					size = accessor.type;
-				}
+				int size = (accessor.type == TINYGLTF_TYPE_SCALAR) ? 1 : accessor.type;
 
 				int vaa = -1;
-				if (attrib.first.compare("POSITION") == 0) vaa = 0;
-				if (attrib.first.compare("NORMAL") == 0) vaa = 1;
-				if (attrib.first.compare("TEXCOORD_0") == 0) vaa = 2;
-				if (attrib.first.compare("JOINTS_0") == 0) vaa = 3;
-				if (attrib.first.compare("WEIGHTS_0") == 0) vaa = 4;
+				if (attrib.first == "POSITION") vaa = 0;
+				if (attrib.first == "NORMAL") vaa = 1;
+				if (attrib.first == "TEXCOORD_0") vaa = 2;
+				if (attrib.first == "JOINTS_0") vaa = 3;
+				if (attrib.first == "WEIGHTS_0") vaa = 4;
 				if (vaa > -1) {
 					glEnableVertexAttribArray(vaa);
 					glVertexAttribPointer(vaa, size, accessor.componentType,
 						accessor.normalized ? GL_TRUE : GL_FALSE,
 						byteStride, BUFFER_OFFSET(accessor.byteOffset));
 				}
-				else {
-					std::cout << "vaa missing: " << attrib.first << std::endl;
-				}
 			}
 
-			// Record VAO for later use
+			// Record VAO and texture for later use
 			PrimitiveObject primitiveObject;
 			primitiveObject.vao = vao;
 			primitiveObject.vbos = vbos;
+
+			// Associate the texture if available
+			if (primitive.material >= 0 && primitive.material < model.materials.size()) {
+				const tinygltf::Material& material = model.materials[primitive.material];
+				if (material.values.find("baseColorTexture") != material.values.end()) {
+					int textureIndex = material.values.at("baseColorTexture").TextureIndex();
+					if (textureIndex >= 0 && textureIndex < textureIDs.size()) {
+						primitiveObject.textureID = textureIDs[textureIndex];
+					}
+				}
+			}
+
 			primitiveObjects.push_back(primitiveObject);
 
 			glBindVertexArray(0);
@@ -559,27 +592,28 @@ struct MyBot {
 	}
 
 	void bindModelNodes(std::vector<PrimitiveObject>& primitiveObjects,
-		tinygltf::Model& model,
-		tinygltf::Node& node) {
-		// Bind buffers for the current mesh at the node
+		tinygltf::Model& model, tinygltf::Node& node,
+		const std::vector<GLuint>& textureIDs) {
 		if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
-			bindMesh(primitiveObjects, model, model.meshes[node.mesh]);
+			bindMesh(primitiveObjects, model, model.meshes[node.mesh], textureIDs);
 		}
 
-		// Recursive into children nodes
 		for (size_t i = 0; i < node.children.size(); i++) {
 			assert((node.children[i] >= 0) && (node.children[i] < model.nodes.size()));
-			bindModelNodes(primitiveObjects, model, model.nodes[node.children[i]]);
+			bindModelNodes(primitiveObjects, model, model.nodes[node.children[i]], textureIDs);
 		}
 	}
 
 	std::vector<PrimitiveObject> bindModel(tinygltf::Model& model) {
 		std::vector<PrimitiveObject> primitiveObjects;
 
+		// Load textures
+		std::vector<GLuint> textureIDs = loadTextures(model);
+
 		const tinygltf::Scene& scene = model.scenes[model.defaultScene];
 		for (size_t i = 0; i < scene.nodes.size(); ++i) {
 			assert((scene.nodes[i] >= 0) && (scene.nodes[i] < model.nodes.size()));
-			bindModelNodes(primitiveObjects, model, model.nodes[scene.nodes[i]]);
+			bindModelNodes(primitiveObjects, model, model.nodes[scene.nodes[i]], textureIDs);
 		}
 
 		return primitiveObjects;
@@ -599,6 +633,12 @@ struct MyBot {
 				glEnableVertexAttribArray(5 + i);
 				glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
 				glVertexAttribDivisor(5 + i, 1);
+			}
+
+			if (primitiveObjects[i].textureID) {
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, primitiveObjects[i].textureID);
+				glUniform1i(textureSamplerID, 0);
 			}
 
 			tinygltf::Primitive primitive = mesh.primitives[i];
