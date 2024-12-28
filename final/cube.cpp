@@ -110,39 +110,39 @@ struct Cube {
 	GLfloat uv_buffer_data[48] = {
 		// Bottom
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f, // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f, // top-left
 
 		// Top
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f, // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f, // top-left
 
 		// Left
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f, // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f, // top-left
 
 		// Right
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f, // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f, // top-left
 
 		// Back
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f, // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f, // top-left
 
 		// Front
 		0.0f, 0.0f, // bottom-left
-		3.0f, 0.0f, // bottom-right
-		3.0f, 3.0f, // top-right
-		0.0f, 3.0f  // top-left
+		1.0f, 0.0f, // bottom-right
+		1.0f, 1.0f, // top-right
+		0.0f, 1.0f  // top-left
 	};
 
 	// OpenGL buffers
@@ -160,7 +160,7 @@ struct Cube {
 	GLuint textureSamplerID;
 	GLuint programID;
 
-	void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms) {
+	void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms, float scale, float height, const char * filepath) {
 		// Define scale of the skybox geometry
 		this->instanceTransforms = instanceTransforms;
 
@@ -179,7 +179,8 @@ struct Cube {
 		glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data), normal_buffer_data, GL_STATIC_DRAW);
 
 		// Create a vertex buffer object to store the UV data
-		for (int i = 0; i < 24; ++i) uv_buffer_data[2 * i + 1] *= 10;
+		for (int i = 0; i < 48; ++i) uv_buffer_data[i] *= scale;
+		for (int i = 0; i < 24; ++i) uv_buffer_data[2 * i + 1] *= height;
 		glGenBuffers(1, &uvBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data), uv_buffer_data, GL_STATIC_DRAW);
@@ -196,7 +197,7 @@ struct Cube {
 		cameraMatrixID = glGetUniformLocation(programID, "camera");
 
 		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox("../final/assets/facade0.png");
+		textureID = LoadTextureTileBox(filepath);
 
 		// Get a handle for our "textureSampler" uniform
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");

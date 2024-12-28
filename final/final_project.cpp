@@ -81,11 +81,27 @@ void generateTile(int x, int y, std::vector<glm::mat4>& gts) {
 	gts.push_back(g);
 }
 
-void generateCubes(int x, int y, std::vector<glm::mat4>& cts) {
+void generateCubes(int x, int y, std::vector<std::vector<glm::mat4>>& transformVectors, int index) {
 	glm::mat4 c(1.0f);
 	c = glm::translate(c, glm::vec3(x, 100, y));
-	c = glm::scale(c, glm::vec3(300, 3000, 300));
-	cts.push_back(c);
+	switch (index) {
+	case 3:
+		c = glm::scale(c, glm::vec3(200, 200 * 10, 200));
+		transformVectors[index].push_back(c);
+		break;
+	case 4:
+		c = glm::scale(c, glm::vec3(300, 300 * 5, 300));
+		transformVectors[index].push_back(c);
+		break;
+	case 5:
+		c = glm::scale(c, glm::vec3(250, 250 * 12, 250));
+		transformVectors[index].push_back(c);
+		break;
+	case 6:
+		c = glm::scale(c, glm::vec3(220, 220 * 8, 220));
+		transformVectors[index].push_back(c);
+		break;
+	}
 }
 
 void generateLamps(int x, int y, std::vector<glm::mat4>& lts) {
@@ -109,18 +125,15 @@ void generateLights(int x, int y, Lighting& lighting) {
 }
 
 // Update visible tiles
-void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts, std::vector<glm::mat4>& cts,
-		std::vector<glm::mat4>& lts, std::vector<glm::mat4>& sts, Lighting& lighting) {
+void updateTiles(const glm::vec3& cameraPos, std::vector<std::vector<glm::mat4>>& transformVectors, 
+	Lighting& lighting, std::vector<int>& buildingIndices) {
 	// Determine the center tile based on camera position
 	int centerTileX = static_cast<int>(round(cameraPos.x / tileSize));
 	int centerTileY = static_cast<int>(round(cameraPos.z / tileSize));
 
 	// Clear the current tile set
 	activeTiles.clear();
-	gts.clear();
-	cts.clear();
-	lts.clear();
-	sts.clear();
+	for (auto& transforms : transformVectors) transforms.clear();
 	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize, particleSystems);
 
 	// Generate a 3x3 grid of tiles centered on the closest tile
@@ -128,24 +141,26 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts, std::v
 		for (int y = centerTileY - 4; y <= centerTileY + 4; ++y) {
 			TileCoord coord{ x, y };
 			activeTiles.insert(coord); // Track the active tile
-			generateTile(x, y, gts);  // Generate the corresponding transformations
+			generateTile(x, y, transformVectors[0]);  // Generate the corresponding transformations
 
 			int modX = ((x - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
 			int modY = ((y - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
 
 			if (modX == 1 && modY == 1) {
 				// CENTER TILE: Generate lamp and stool
-				generateLamps(x, y, lts);
-				generateStools(x, y, sts);
+				generateLamps(x, y, transformVectors[1]);
+				generateStools(x, y, transformVectors[2]);
 				if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
 					y >= centerTileY - 2 && y <= centerTileY + 2)
 					generateLights(x, y, lighting);
 			}
 			else if (modX == modY || modX + modY == 2) {
 				// DIAGONAL AXES: Generate a group of buildings
+				int b = 0;
 				for (int i = -1; i <= 1; ++i) {
 					for (int j = -1; j <= 1; ++j) {
-						generateCubes(x * tileSize + i * 500, y * tileSize + j * 500, cts);
+						generateCubes(x * tileSize + i * 500, y * tileSize + j * 500, transformVectors, buildingIndices[b]);
+						b++;
 					}
 				}
 			}   // X AND Y AXES: Empty
@@ -204,19 +219,32 @@ int main(void)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
 
+	std::vector<int> buildingIndices;
+	for (int i = 0; i < 9; i++) buildingIndices.push_back(3 + static_cast<int>(rand() % 4));
+
 	// Create the Scene
-	std::vector<glm::mat4> gts, lts, sts, cts;
+	std::vector<std::vector<glm::mat4>> transformVectors;
+	for (int i = 0; i < 7; i++) {
+		std::vector<glm::mat4> transforms;
+		transformVectors.push_back(transforms);
+	}
 	Lighting lighting;
 	lighting.initialize(shadowMapWidth, shadowMapHeight);
-	updateTiles(camera.position, gts, cts, lts, sts, lighting);
+	updateTiles(camera.position, transformVectors, lighting, buildingIndices);
 	Plane ground;
-	ground.initialize(lighting.programID, gts);
-	Cube building;
-	building.initialize(lighting.programID, cts);
+	ground.initialize(lighting.programID, transformVectors[0]);
 	StaticModel lamp;
-	lamp.initialize(lighting.programID, lts, "../final/model/lamp/street_lamp_01_1k.gltf");
+	lamp.initialize(lighting.programID, transformVectors[1], "../final/model/lamp/street_lamp_01_1k.gltf");
 	StaticModel stool;
-	stool.initialize(lighting.programID, sts, "../final/model/stool/folding_wooden_stool_1k.gltf");
+	stool.initialize(lighting.programID, transformVectors[2], "../final/model/stool/folding_wooden_stool_1k.gltf");
+	Cube cyberBuilding;
+	cyberBuilding.initialize(lighting.programID, transformVectors[3], 3, 10, "../final/assets/facade0.png");
+	Cube officeBuilding;
+	officeBuilding.initialize(lighting.programID, transformVectors[4], 1, 5, "../final/assets/facade5.png");
+	Cube technoBuilding;
+	technoBuilding.initialize(lighting.programID, transformVectors[5], 3, 12, "../final/assets/facade1.png");
+	Cube steampunkBuilding;
+	steampunkBuilding.initialize(lighting.programID, transformVectors[6], 4, 8, "../final/assets/facade7.png");
 
 	// Our 3D character
 	//MyBot bot;
@@ -227,7 +255,10 @@ int main(void)
 	//models.push_back(lamp);
 
 	std::vector<Cube> cubes;
-	cubes.push_back(building);
+	cubes.push_back(cyberBuilding);
+	cubes.push_back(officeBuilding);
+	cubes.push_back(technoBuilding);
+	cubes.push_back(steampunkBuilding);
 
 	// Camera setup
 	glm::mat4 viewMatrix, projectionMatrix, lightProjection;
@@ -274,15 +305,21 @@ int main(void)
 
 		// Update tiles
 		glm::vec3 cameraPos = camera.position;
-		updateTiles(cameraPos, gts, cts, lts, sts, lighting);
-		ground.updateInstances(gts);
-		building.updateInstances(cts);
-		lamp.updateInstanceMatrices(lts);
-		stool.updateInstanceMatrices(sts);
+		updateTiles(camera.position, transformVectors, lighting, buildingIndices);
+		ground.updateInstances(transformVectors[0]);
+		lamp.updateInstanceMatrices(transformVectors[1]);
+		stool.updateInstanceMatrices(transformVectors[2]);
+		cyberBuilding.updateInstances(transformVectors[3]);
+		officeBuilding.updateInstances(transformVectors[4]);
+		technoBuilding.updateInstances(transformVectors[5]);
+		steampunkBuilding.updateInstances(transformVectors[6]);
 		models.clear();
 		models.push_back(stool);
 		cubes.clear();
-		cubes.push_back(building);
+		cubes.push_back(cyberBuilding);
+		cubes.push_back(officeBuilding);
+		cubes.push_back(technoBuilding);
+		cubes.push_back(steampunkBuilding);
 		for (auto& particleSystem : particleSystems) particleSystem.update(deltaTime);
 
 		// Compute camera matrix
@@ -298,7 +335,7 @@ int main(void)
 		sky.render(vp);
 		lighting.prepareLighting(cameraPos);
 		ground.render(vp);
-		building.render(vp);
+		for (auto& cube : cubes) cube.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
 		for (auto& particleSystem : particleSystems) particleSystem.render(vp, cameraPos);
@@ -328,7 +365,7 @@ int main(void)
 	sky.cleanup();
 	//bot.cleanup();
 	ground.cleanup();
-	building.cleanup();
+	for (auto& cube : cubes) cube.cleanup();
 	lighting.cleanup();
 	for (auto& particleSystem : particleSystems) particleSystem.cleanup();
 
