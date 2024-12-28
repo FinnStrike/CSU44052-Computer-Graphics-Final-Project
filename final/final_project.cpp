@@ -51,7 +51,7 @@ const float tileSize = 1024;
 
 // Animation 
 static bool playAnimation = true;
-static float playbackSpeed = 2.0f;
+static float playbackSpeed = 3.5f;
 
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
@@ -118,6 +118,12 @@ void generateStools(int x, int y, std::vector<glm::mat4>& sts) {
 	sts.push_back(s);
 }
 
+void generateBots(int x, int y, std::vector<glm::mat4>& bts) {
+	glm::mat4 b(1.0f);
+	b = glm::translate(b, glm::vec3(x * tileSize + 10, 70, (y * tileSize) - (tileSize * 1.5f) - 10));
+	bts.push_back(b);
+}
+
 void generateLights(int x, int y, Lighting& lighting) {
 	glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x * tileSize, 0.0f, y * tileSize));
 	glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
@@ -136,7 +142,7 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<std::vector<glm::mat4>>
 	for (auto& transforms : transformVectors) transforms.clear();
 	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize, particleSystems);
 
-	// Generate a 3x3 grid of tiles centered on the closest tile
+	// Generate a 9x9 grid of tiles centered on the closest tile
 	for (int x = centerTileX - 4; x <= centerTileX + 4; ++x) {
 		for (int y = centerTileY - 4; y <= centerTileY + 4; ++y) {
 			TileCoord coord{ x, y };
@@ -147,9 +153,10 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<std::vector<glm::mat4>>
 			int modY = ((y - 2) % 3 + 3) % 3; // Shift grid by 1 to align origin
 
 			if (modX == 1 && modY == 1) {
-				// CENTER TILE: Generate lamp and stool
+				// CENTER TILE: Generate lamp, stool and bot
 				generateLamps(x, y, transformVectors[1]);
 				generateStools(x, y, transformVectors[2]);
+				generateBots(x, y, transformVectors[7]);
 				if (x >= centerTileX - 2 && x <= centerTileX + 2 &&
 					y >= centerTileY - 2 && y <= centerTileY + 2)
 					generateLights(x, y, lighting);
@@ -224,7 +231,7 @@ int main(void)
 
 	// Create the Scene
 	std::vector<std::vector<glm::mat4>> transformVectors;
-	for (int i = 0; i < 7; i++) {
+	for (int i = 0; i < 8; i++) {
 		std::vector<glm::mat4> transforms;
 		transformVectors.push_back(transforms);
 	}
@@ -245,10 +252,8 @@ int main(void)
 	technoBuilding.initialize(lighting.programID, transformVectors[5], 3, 12, "../final/assets/facade1.png");
 	Cube steampunkBuilding;
 	steampunkBuilding.initialize(lighting.programID, transformVectors[6], 4, 8, "../final/assets/facade7.png");
-
-	// Our 3D character
-	//MyBot bot;
-	//bot.initialize(lightPosition, lightIntensity);
+	MyBot bot;
+	bot.initialize(transformVectors[7]);
 
 	std::vector<StaticModel> models;
 	models.push_back(stool);
@@ -282,7 +287,7 @@ int main(void)
 
 		if (playAnimation) {
 			time += deltaTime * playbackSpeed;
-			//bot.update(time);
+			bot.update(time);
 		}
 
 		// Check for edge turning
@@ -313,6 +318,7 @@ int main(void)
 		officeBuilding.updateInstances(transformVectors[4]);
 		technoBuilding.updateInstances(transformVectors[5]);
 		steampunkBuilding.updateInstances(transformVectors[6]);
+		bot.updateInstanceMatrices(transformVectors[7]);
 		models.clear();
 		models.push_back(stool);
 		cubes.clear();
@@ -327,7 +333,6 @@ int main(void)
 		glm::mat4 vp = projectionMatrix * viewMatrix;
 
 		// Render the scene
-		//bot.render(vp);
 		lighting.performShadowPass(lightProjection, models, cubes);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 		//glViewport(0, 0, windowWidth, windowHeight);
@@ -338,6 +343,7 @@ int main(void)
 		for (auto& cube : cubes) cube.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
+		bot.render(vp, cameraPos);
 		for (auto& particleSystem : particleSystems) particleSystem.render(vp, cameraPos);
 
 		// FPS tracking 
@@ -363,7 +369,7 @@ int main(void)
 
 	// Clean up
 	sky.cleanup();
-	//bot.cleanup();
+	bot.cleanup();
 	ground.cleanup();
 	for (auto& cube : cubes) cube.cleanup();
 	lighting.cleanup();

@@ -27,7 +27,6 @@ struct StaticModel {
         bool isLight;
         GLuint instanceVBO;
         int instanceCount;
-
     };
     std::vector<PrimitiveObject> primitiveObjects;
 

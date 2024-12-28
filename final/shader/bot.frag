@@ -2,11 +2,17 @@
 
 in vec3 worldPosition;
 in vec3 worldNormal; 
+in mat4 modelMatrix;
 
-out vec3 finalColor;
+out vec4 finalColor;
 
 uniform vec3 lightPosition;
 uniform vec3 lightIntensity;
+uniform vec3 cameraPosition;
+
+const float FOG_MIN_DIST = 1024;
+const float FOG_MAX_DIST = 2048;
+const vec4 FOG_COLOUR = vec4(0.004f, 0.02f, 0.05f, 0.0);
 
 void main()
 {
@@ -20,5 +26,12 @@ void main()
 	v = v / (1.0 + v);
 
 	// Gamma correction
-	finalColor = pow(v, vec3(1.0 / 2.2));
+	vec4 fragColor = vec4(pow(v, vec3(1.0 / 2.2)), 1.0);
+
+	// Fogging
+	vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
+    float distanceToCamera = length(fragPosition - cameraPosition);
+    float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);
+
+	finalColor = mix(fragColor, FOG_COLOUR, fogFactor);
 }

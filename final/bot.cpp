@@ -18,10 +18,14 @@ struct MyBot {
 
 	tinygltf::Model model;
 
+	glm::mat4 modelMatrix;
+
 	// Each VAO corresponds to each mesh primitive in the GLTF model
 	struct PrimitiveObject {
 		GLuint vao;
 		std::map<int, GLuint> vbos;
+		GLuint instanceVBO;
+		int instanceCount;
 	};
 	std::vector<PrimitiveObject> primitiveObjects;
 
@@ -399,9 +403,12 @@ struct MyBot {
 		return res;
 	}
 
-	void initialize(glm::vec3 lightPosition, glm::vec3 lightIntensity) {
-		this->lightPosition = lightPosition;
-		this->lightIntensity = lightIntensity;
+	void initialize(const std::vector<glm::mat4>& instanceTransforms) {
+		this->lightPosition = glm::vec3(0.0f, 527.5f, 0.0f);
+		glm::vec3 wave500(0.0f, 255.0f, 146.0f);
+		glm::vec3 wave600(255.0f, 190.0f, 0.0f);
+		glm::vec3 wave700(205.0f, 0.0f, 0.0f);
+		this->lightIntensity = 5.0f * (12.0f * wave500 + 12.0f * wave600 + 10.0f * wave700);
 
 		// Modify your path if needed
 		if (!loadModel(model, "../final/model/bot/bot.gltf")) {
@@ -410,6 +417,11 @@ struct MyBot {
 
 		// Prepare buffers for rendering 
 		primitiveObjects = bindModel(model);
+
+		// Prepare Instance buffer
+		for (auto& primitive : primitiveObjects) {
+			setupInstanceBuffer(primitive, instanceTransforms);
+		}
 
 		// Prepare joint matrices
 		skinObjects = prepareSkinning(model);
@@ -429,6 +441,45 @@ struct MyBot {
 		jointMatricesID = glGetUniformLocation(programID, "jointMatrices");
 		lightPositionID = glGetUniformLocation(programID, "lightPosition");
 		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
+	}
+
+	void setupInstanceBuffer(PrimitiveObject& primitiveObject, const std::vector<glm::mat4>& instanceTransforms) {
+		glGenBuffers(1, &primitiveObject.instanceVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, primitiveObject.instanceVBO);
+		glBufferData(GL_ARRAY_BUFFER, instanceTransforms.size() * sizeof(glm::mat4), instanceTransforms.data(), GL_STATIC_DRAW);
+
+		glBindVertexArray(primitiveObject.vao);
+
+		// Enable and set instance attributes (4x vec4 for mat4)
+		for (int i = 0; i < 4; i++) {
+			glEnableVertexAttribArray(5 + i); // Instance matrix starts at location 5
+			glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+			glVertexAttribDivisor(5 + i, 1); // Advance per instance
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		primitiveObject.instanceCount = instanceTransforms.size();
+	}
+
+	void updateInstanceMatrices(const std::vector<glm::mat4>& newInstanceMatrices) {
+		for (auto& primitive : primitiveObjects) {
+			glBindBuffer(GL_ARRAY_BUFFER, primitive.instanceVBO);
+
+			// Update instance matrices data
+			if (newInstanceMatrices.size() <= primitive.instanceCount) {
+				// Update the existing buffer
+				glBufferSubData(GL_ARRAY_BUFFER, 0, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data());
+			}
+			else {
+				// Reallocate the buffer if the size increases
+				glBufferData(GL_ARRAY_BUFFER, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data(), GL_DYNAMIC_DRAW);
+			}
+
+			// Update instance count
+			primitive.instanceCount = newInstanceMatrices.size();
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+		}
 	}
 
 	void bindMesh(std::vector<PrimitiveObject>& primitiveObjects,
@@ -543,17 +594,27 @@ struct MyBot {
 			std::map<int, GLuint> vbos = primitiveObjects[i].vbos;
 
 			glBindVertexArray(vao);
+			glBindBuffer(GL_ARRAY_BUFFER, primitiveObjects[i].instanceVBO);
+			for (int i = 0; i < 4; ++i) {
+				glEnableVertexAttribArray(5 + i);
+				glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+				glVertexAttribDivisor(5 + i, 1);
+			}
 
 			tinygltf::Primitive primitive = mesh.primitives[i];
 			tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
 
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos.at(indexAccessor.bufferView));
 
-			glDrawElements(primitive.mode, indexAccessor.count,
+			glDrawElementsInstanced(primitive.mode, indexAccessor.count,
 				indexAccessor.componentType,
-				BUFFER_OFFSET(indexAccessor.byteOffset));
+				BUFFER_OFFSET(indexAccessor.byteOffset),
+				primitiveObjects[i].instanceCount);
 
 			glBindVertexArray(0);
+			for (int i = 0; i < 4; ++i) {
+				glDisableVertexAttribArray(3 + i);
+			}
 		}
 	}
 
@@ -576,7 +637,9 @@ struct MyBot {
 		}
 	}
 
-	void render(glm::mat4 cameraMatrix) {
+	void render(glm::mat4 cameraMatrix, glm::vec3 cameraPos) {
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(programID);
 
 		// Set camera
@@ -596,9 +659,13 @@ struct MyBot {
 		// Set light data 
 		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
 		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
+		glUniform3fv(glGetUniformLocation(programID, "cameraPosition"), 1, &cameraPos[0]);
 
 		// Draw the GLTF model
 		drawModel(primitiveObjects, model);
+		glDisable(GL_BLEND);
+		glUseProgram(0);
+		glBindVertexArray(0);
 	}
 
 	void cleanup() {
