@@ -5,6 +5,9 @@
 #include <animation.cpp>
 #include <lighting.cpp>
 
+#define MINIAUDIO_IMPLEMENTATION
+#include <miniaudio.h>
+
 static GLFWwindow* window;
 static int windowWidth = 1024;
 static int windowHeight = 768;
@@ -228,6 +231,23 @@ int main(void)
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 
+	// Create audio engine
+	ma_engine engine;
+	if (ma_engine_init(NULL, &engine) != MA_SUCCESS) {
+		std::cerr << "Failed to initialize audio engine." << std::endl;
+	}
+
+	// Load the music and set it to loop
+	ma_sound music;
+	ma_sound_config soundConfig = ma_sound_config_init();
+	soundConfig.flags = MA_SOUND_FLAG_STREAM;
+	if (ma_sound_init_from_file(&engine, "../final/assets/Winter.mp3",
+		0, nullptr, nullptr, &music) != MA_SUCCESS) {
+		std::cerr << "Failed to load sound." << std::endl;
+		ma_engine_uninit(&engine);
+	}
+	ma_sound_set_looping(&music, MA_TRUE);
+
 	// Create the skybox (centered on camera)
 	Skybox sky;
 	sky.initialize(glm::vec3(eye_center.x, eye_center.y - 2500, eye_center.z), glm::vec3(5000, 5000, 5000));
@@ -290,6 +310,9 @@ int main(void)
 	float foxTime = 0.0f;
 	float fTime = 0.0f;
 	unsigned long frames = 0;
+
+	// Start the music
+	ma_sound_start(&music);
 
 	do
 	{
@@ -394,6 +417,9 @@ int main(void)
 	for (auto& cube : cubes) cube.cleanup();
 	lighting.cleanup();
 	for (auto& particleSystem : particleSystems) particleSystem.cleanup();
+
+	ma_sound_uninit(&music);
+	ma_engine_uninit(&engine);
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
