@@ -285,6 +285,7 @@ int main(void)
 		models.push_back(stool);
 		cubes.clear();
 		cubes.push_back(building);
+		particleSystem.update(deltaTime);
 
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
@@ -302,7 +303,7 @@ int main(void)
 		building.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
-		particleSystem.render(vp);
+		particleSystem.render(vp, cameraPos);
 
 		// FPS tracking 
 		// Count number of frames over a few seconds and take average
