@@ -18,12 +18,17 @@ public:
 
     std::vector<Light> lights;
     GLuint programID, depthProgramID;
-
+    GLuint lightSpaceID;
+    GLuint cameraPositionID;
+    GLuint lightCountID;
     GLuint shadowMapArray;
+    GLuint shadowMapArrayID;
 
     int shadowMapWidth, shadowMapHeight;
 
-    int maxLights = 100;
+    // Practically we should never exceed this limit given the rulesets
+    // - there'll never be more than 4 at any one time
+    int maxLights = 9;
 
     bool saveDepth = true;
 
@@ -31,6 +36,7 @@ public:
         this->shadowMapWidth = shadowMapWidth;
         this->shadowMapHeight = shadowMapHeight;
 
+        // Compile programs for main and depth shaders
         programID = LoadShadersFromFile("../final/shader/model.vert", "../final/shader/model.frag");
         if (programID == 0)
         {
@@ -42,6 +48,13 @@ public:
             std::cerr << "Failed to load depth shaders." << std::endl;
         }
 
+        // Get a handle for GLSL variables
+        lightSpaceID = glGetUniformLocation(depthProgramID, "lightSpace");
+        shadowMapArrayID = glGetUniformLocation(programID, "shadowMapArray");
+        cameraPositionID = glGetUniformLocation(programID, "cameraPosition");
+        lightCountID = glGetUniformLocation(programID, "lightCount");
+
+        // Construct an array of textures to contain shadow maps for each light
         glGenTextures(1, &shadowMapArray);
         glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, maxLights, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -58,10 +71,9 @@ public:
     }
 
     void addLight(glm::vec3 position, glm::vec3 intensity, float exposure, std::vector<ParticleSystem>& particleSystems) {
-        // Check if light already exists
         for (const auto& existingLight : lights) {
             if (glm::distance(existingLight.position, position) < 0.1f) {
-                return; // Light already exists, so don't add it again
+                return;
             }
         }
 
@@ -69,21 +81,19 @@ public:
         light.position = position;
         light.intensity = intensity;
         light.exposure = exposure;
-
-        // Adjust light intensity
         for (int i = 0; i < 125; i++) light.intensity /= 1.1f;
 
-        // Initialize shadow framebuffer (we're using the shared shadow map array)
+        // Initialize shadow framebuffer
         glGenFramebuffers(1, &light.shadowFBO);
         glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
 
-        // Ensure that lights.size() is valid for the texture layer
+        // Ensure that lights.size() is within range
         if (lights.size() >= maxLights) {
             std::cerr << "Error: Trying to attach a shadow map layer that exceeds the texture array size." << std::endl;
             std::cerr << "lights.size() = " << lights.size() << std::endl;
         }
         else {
-            // Bind the shadow map array to the framebuffer (attach the appropriate layer)
+            // Bind the current layer of the shadow map array to the framebuffer
             glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapArray, 0, lights.size());
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
@@ -96,6 +106,7 @@ public:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+        // Create a new particle system at this location
         ParticleSystem particles;
         particles.initialize(glm::vec3(position.x, 0.0f, position.z));
         particleSystems.push_back(particles);
@@ -103,15 +114,13 @@ public:
         lights.push_back(light);
     }
 
-    // Remove lights that are outside the 5x5 grid centered around the camera
-    void removeLightsOutsideGrid(int centerX, int centerY, float tileSize, std::vector<ParticleSystem>& particleSystems) {
+    void trimLights(int centerX, int centerY, float tileSize, std::vector<ParticleSystem>& particleSystems) {
+        // Remove lights that are outside the 5x5 grid centered around the camera
         std::vector<Light> remainingLights;
         std::vector<ParticleSystem> remainingParticles;
         for (int i = 0; i < lights.size(); i++) {
             int lightX = static_cast<int>(round(lights[i].position.x / tileSize));
             int lightY = static_cast<int>(round(lights[i].position.z / tileSize));
-
-            // Keep lights within the 5x5 grid range centered on (centerX, centerY)
             if (abs(lightX - centerX) <= 2 && abs(lightY - centerY) <= 2) {
                 remainingLights.push_back(lights[i]);
                 remainingParticles.push_back(particleSystems[i]);
@@ -122,7 +131,7 @@ public:
     }
 
     void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Cube> cubes) {
-        // Perform Shadow pass
+        // Perform Shadow pass using static models and cubes
         glUseProgram(depthProgramID);
         for (size_t i = 0; i < lights.size(); ++i) {
             Light light = lights[i];
@@ -134,14 +143,13 @@ public:
 
             glBindFramebuffer(GL_FRAMEBUFFER, light.shadowFBO);
             glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapArray, 0, i);
-            //glViewport(0, 0, shadowMapWidth, shadowMapWidth);
             glClear(GL_DEPTH_BUFFER_BIT);
 
             for (auto& model : models) {
-                model.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
+                model.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
             }
             for (auto& cube : cubes) {
-                cube.renderDepth(depthProgramID, glGetUniformLocation(depthProgramID, "lightSpace"), light.lightSpaceMatrix);
+                cube.renderDepth(depthProgramID, lightSpaceID, light.lightSpaceMatrix);
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -153,6 +161,8 @@ public:
     }
 
     void prepareLighting(glm::vec3 cameraPos) {
+        // To be called before rendering static models, planes and cubes
+        // Sets all the light-related parameters in the main shaders
         glUseProgram(programID);
 
         for (int i = 0; i < lights.size(); ++i) {
@@ -164,14 +174,13 @@ public:
             glUniformMatrix4fv(glGetUniformLocation(programID, ("lightSpaceMatrices[" + index + "]").c_str()), 1, GL_FALSE, &lights[i].lightSpaceMatrix[0][0]);
         }
 
-        GLuint shadowMapArrayID = glGetUniformLocation(programID, "shadowMapArray");
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
         glUniform1i(shadowMapArrayID, 1);
 
-        glUniform3fv(glGetUniformLocation(programID, "cameraPosition"), 1, &cameraPos[0]);
+        glUniform3fv(cameraPositionID, 1, &cameraPos[0]);
 
-        glUniform1i(glGetUniformLocation(programID, "lightCount"), lights.size());
+        glUniform1i(lightCountID, lights.size());
     }
 
     void cleanup() {
@@ -179,9 +188,12 @@ public:
             glDeleteTextures(1, &shadowMapArray);
             glDeleteFramebuffers(1, &light.shadowFBO);
         }
+        glDeleteProgram(programID);
+        glDeleteProgram(depthProgramID);
     }
 
     void saveDepthTexture(GLuint fbo, std::string filename) {
+        // Save each depth map at the first shadow pass
         int width = shadowMapWidth;
         int height = shadowMapHeight;
         int channels = 3;

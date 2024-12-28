@@ -2,8 +2,8 @@
 #include <render/texture.h>
 
 struct Skybox {
-	glm::vec3 position;		// Position of the box
-	glm::vec3 scale;		// Size of the box in each axis
+	glm::vec3 position;
+	glm::vec3 scale;
 
 	GLfloat vertex_buffer_data[72] = {	// Vertex definition for a canonical box
 		// Front face
@@ -43,6 +43,7 @@ struct Skybox {
 		-1.0f, -1.0f, 1.0f,
 	};
 
+	// Not actually used
 	GLfloat color_buffer_data[72] = {
 		// Front, red
 		1.0f, 0.0f, 0.0f,
@@ -190,13 +191,11 @@ struct Skybox {
 			std::cerr << "Failed to load shaders." << std::endl;
 		}
 
-		// Get a handle for our "MVP" uniform
-		mvpMatrixID = glGetUniformLocation(programID, "MVP");
-
-		// Load a random texture into the GPU memory
+		// Load the texture into GPU memory
 		textureID = LoadTextureTileBox("../final/assets/stars.png");
 
-		// Get a handle for our "textureSampler" uniform
+		// Get a handle for GLSL variables
+		mvpMatrixID = glGetUniformLocation(programID, "MVP");
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
 	}
 
@@ -219,6 +218,14 @@ struct Skybox {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glUniform1i(textureSamplerID, 0);
+
 		// Model transform
 		glm::mat4 modelMatrix = glm::mat4(1.0f);
 		modelMatrix = glm::translate(modelMatrix, position);
@@ -227,27 +234,10 @@ struct Skybox {
 		modelMatrix = glm::scale(modelMatrix, scale);
 		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.5f, 0.0f));
 
-		// Set model-view-projection matrix
 		glm::mat4 mvp = cameraMatrix * modelMatrix;
 		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
 
-		// Enable UV buffer and texture sampler
-		glEnableVertexAttribArray(2);
-		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-		// Set textureSampler to use texture unit 0
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glUniform1i(textureSamplerID, 0);
-
-		// Draw the box
-		glDrawElements(
-			GL_TRIANGLES,      // mode
-			36,    			   // number of indices
-			GL_UNSIGNED_INT,   // type
-			(void*)0           // element array buffer offset
-		);
+		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0);
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);

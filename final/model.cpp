@@ -6,7 +6,6 @@
 struct StaticModel {
     // Shader variable IDs
     GLuint cameraMatrixID;
-    GLuint jointMatricesID;
     GLuint programID;
     GLuint textureSamplerID;
     GLuint baseColorFactorID;
@@ -57,9 +56,7 @@ struct StaticModel {
         std::vector<glm::mat4>& globalTransforms) {
         const tinygltf::Node& node = model.nodes[nodeIndex];
         glm::mat4 currentTransform = parentTransform * getNodeTransform(node);
-
         globalTransforms[nodeIndex] = currentTransform;
-
         for (int childIndex : node.children) {
             computeGlobalNodeTransform(model, childIndex, currentTransform, globalTransforms);
         }
@@ -111,15 +108,15 @@ struct StaticModel {
             glGenerateMipmap(GL_TEXTURE_2D);
 
             textureIDs[i] = texID;
-            glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         return textureIDs;
     }
 
     void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms, const char * filepath) {
-        // Modify your path if needed
-        if (!loadModel(model, filepath /*"../final/model/tree/tree_small_02_1k.gltf"*/)) {
+        // Load model from file
+        if (!loadModel(model, filepath)) {
             return;
         }
 
@@ -150,9 +147,9 @@ struct StaticModel {
 
         // Enable and set instance attributes (4x vec4 for mat4)
         for (int i = 0; i < 4; i++) {
-            glEnableVertexAttribArray(3 + i); // Instance matrix starts at location 3
+            glEnableVertexAttribArray(3 + i);
             glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
-            glVertexAttribDivisor(3 + i, 1); // Advance per instance
+            glVertexAttribDivisor(3 + i, 1);
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -164,17 +161,14 @@ struct StaticModel {
         for (auto& primitive : primitiveObjects) {
             glBindBuffer(GL_ARRAY_BUFFER, primitive.instanceVBO);
 
-            // Update instance matrices data
+            // Check if the data size has changed
             if (newInstanceMatrices.size() <= primitive.instanceCount) {
-                // Update the existing buffer
                 glBufferSubData(GL_ARRAY_BUFFER, 0, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data());
-            }
-            else {
-                // Reallocate the buffer if the size increases
+            } else {
+                // Reallocate buffer if so
                 glBufferData(GL_ARRAY_BUFFER, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data(), GL_DYNAMIC_DRAW);
             }
 
-            // Update instance count
             primitive.instanceCount = newInstanceMatrices.size();
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
@@ -334,13 +328,15 @@ struct StaticModel {
                         );
                     }
                     else {
-                        primitiveObject.baseColorFactor = glm::vec4(1.0f); // Default to opaque white
+                        // Default to opaque white
+                        primitiveObject.baseColorFactor = glm::vec4(1.0f);
                     }
                     primitiveObject.isLight = (material.name == "street_lamp_01_bulb");
                 }
                 else {
+                    // Default to opaque white
                     primitiveObject.textureID = 0;
-                    primitiveObject.baseColorFactor = glm::vec4(1.0f); // Default to opaque white
+                    primitiveObject.baseColorFactor = glm::vec4(1.0f);
                 }
 
                 glBindVertexArray(0);
@@ -355,7 +351,7 @@ struct StaticModel {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // Pass in model-view-projection matrix
+        // Set camera
         glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
 
         // Separate opaque and transparent objects
@@ -395,9 +391,9 @@ struct StaticModel {
         // Sort transparent objects by distance from the camera
         std::sort(transparentObjects.begin(), transparentObjects.end(),
             [&cameraMatrix](const PrimitiveObject* a, const PrimitiveObject* b) {
-                glm::vec3 aPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // Center of object A
-                glm::vec3 bPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // Center of object B
-                return glm::length(aPos) > glm::length(bPos); // Sort back-to-front
+                glm::vec3 aPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                glm::vec3 bPos = glm::vec3(cameraMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                return glm::length(aPos) > glm::length(bPos);
             });
 
         // Render transparent objects
@@ -420,7 +416,6 @@ struct StaticModel {
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
-        // Reset state
         glDisable(GL_BLEND);
         for (int i = 0; i < 4; ++i) {
             glDisableVertexAttribArray(3 + i);
@@ -432,7 +427,6 @@ struct StaticModel {
     void renderDepth(GLuint programID, GLuint lightMatID, const glm::mat4& lightSpaceMatrix) {
         glUseProgram(programID);
 
-        // Pass the MVP matrix to the shader
         glUniformMatrix4fv(lightMatID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
 
         // Render each primitive
@@ -447,7 +441,6 @@ struct StaticModel {
             glDrawElementsInstanced(GL_TRIANGLES, primitive.indexCount, primitive.indexType, 0, primitive.instanceCount);
         }
 
-        // Reset state
         for (int i = 0; i < 4; ++i) {
             glDisableVertexAttribArray(3 + i);
         }

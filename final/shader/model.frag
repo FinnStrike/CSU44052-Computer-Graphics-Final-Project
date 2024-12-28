@@ -11,7 +11,7 @@ uniform int isLight;
 
 out vec4 finalColor;
 
-const int MAX_LIGHTS = 50;
+const int MAX_LIGHTS = 9;
 const float FOG_MIN_DIST = 1024;
 const float FOG_MAX_DIST = 2048;
 const vec4 FOG_COLOUR = vec4(0.004f, 0.02f, 0.05f, 0.0);
@@ -31,7 +31,10 @@ void main()
         vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
         vec3 finalLighting = vec3(0.0);
 
+        // Accumulate lighting for each light in the scene
         for (int i = 0; i < lightCount; ++i) {
+            
+            // Attenuation to give a nice radius of light around lamps
             vec3 lightDirection = normalize(lightPositions[i] - fragPosition);
             float distance = length(lightPositions[i] - fragPosition);
             float attenuation = 1.0f;
@@ -62,32 +65,28 @@ void main()
                     float closestDepth = pow(texture(shadowMapArray, coord).r, 50);
                     float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
                     shadow = lightCoords.z - bias >= closestDepth ? 0.2 : 1.0;
-                    //vec2 texelSize = 1.0 / textureSize(shadowMapArray, 0).xz;
-                    //for (int x = -1; x <= 1; ++x) {
-                    //    for (int y = -1; y <= 1; ++y) {
-                    //        float pcfDepth = pow(texture(shadowMapArray, vec3(coord.xy + vec2(x, y) * texelSize, i)).r, 50);
-                    //        shadow += lightCoords.z - bias >= pcfDepth ? 0.2 : 1.0;
-                    //    }
-                    //}
-                    //shadow /= 9.0;
                 }
                 diffuse *= shadow;
             }
             finalLighting += diffuse * lightExposures[i];
         }
-
+        
+        // Apply accumulated lighting and texture
         vec3 exposedColor = finalLighting;
         vec3 toneMappedColor = exposedColor / (exposedColor + vec3(1.0));
         vec4 baseColor = texture(textureSampler, uv).rgba * baseColorFactor;
         vec4 fragColor = vec4(pow(toneMappedColor, vec3(1.0 / 2.2)), 1.0) * baseColor;
 
+        // Apply fog
         float distanceToCamera = length(fragPosition - cameraPosition);
         float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);
-
         finalColor = mix(fragColor, FOG_COLOUR, fogFactor);
+
+        // If fragment is glass add a yellow tint
         if (baseColorFactor.a < 1.0) finalColor = vec4(mix(finalColor.rgb, vec3(1.0, 1.0, 0.0), 0.5), finalColor.a);
     }
     else {
+        // If the fragment is a light, it should be solid yellow
         vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
         float distanceToCamera = length(fragPosition - cameraPosition);
         float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);

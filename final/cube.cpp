@@ -19,34 +19,34 @@ struct Cube {
 		-0.5f, 0.0f,  0.5f, // top-left
 
 		// Top
-		-0.5f, 1.0f,  0.5f, // bottom-left
-		 0.5f, 1.0f,  0.5f, // bottom-right
-		 0.5f, 1.0f, -0.5f, // top-right
-		-0.5f, 1.0f, -0.5f, // top-left
+		-0.5f, 1.0f,  0.5f,
+		 0.5f, 1.0f,  0.5f,
+		 0.5f, 1.0f, -0.5f,
+		-0.5f, 1.0f, -0.5f,
 
 		// Left
-		-0.5f, 0.0f, -0.5f, // bottom-left
-		-0.5f, 0.0f,  0.5f, // bottom-right
-		-0.5f, 1.0f,  0.5f, // top-right
-		-0.5f, 1.0f, -0.5f, // top-left
+		-0.5f, 0.0f, -0.5f,
+		-0.5f, 0.0f,  0.5f,
+		-0.5f, 1.0f,  0.5f,
+		-0.5f, 1.0f, -0.5f,
 
 		// Right
-		 0.5f, 0.0f,  0.5f, // bottom-left
-		 0.5f, 0.0f, -0.5f, // bottom-right
-		 0.5f, 1.0f, -0.5f, // top-right
-		 0.5f, 1.0f,  0.5f, // top-left
+		 0.5f, 0.0f,  0.5f,
+		 0.5f, 0.0f, -0.5f,
+		 0.5f, 1.0f, -0.5f,
+		 0.5f, 1.0f,  0.5f,
 
 		// Back
-		 0.5f, 0.0f, -0.5f, // bottom-left
-		-0.5f, 0.0f, -0.5f, // bottom-right
-		-0.5f, 1.0f, -0.5f, // top-right
-		 0.5f, 1.0f, -0.5f, // top-left
+		 0.5f, 0.0f, -0.5f,
+		-0.5f, 0.0f, -0.5f,
+		-0.5f, 1.0f, -0.5f,
+		 0.5f, 1.0f, -0.5f,
 
 		// Front
-		-0.5f, 0.0f,  0.5f, // bottom-left
-		 0.5f, 0.0f,  0.5f, // bottom-right
-		 0.5f, 1.0f,  0.5f, // top-right
-		-0.5f, 1.0f,  0.5f  // top-left
+		-0.5f, 0.0f,  0.5f,
+		 0.5f, 0.0f,  0.5f,
+		 0.5f, 1.0f,  0.5f,
+		-0.5f, 1.0f,  0.5f
 	};
 
 	GLfloat normal_buffer_data[72] = {
@@ -115,34 +115,34 @@ struct Cube {
 		0.0f, 1.0f, // top-left
 
 		// Top
-		0.0f, 0.0f, // bottom-left
-		1.0f, 0.0f, // bottom-right
-		1.0f, 1.0f, // top-right
-		0.0f, 1.0f, // top-left
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
 		// Left
-		0.0f, 0.0f, // bottom-left
-		1.0f, 0.0f, // bottom-right
-		1.0f, 1.0f, // top-right
-		0.0f, 1.0f, // top-left
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
 		// Right
-		0.0f, 0.0f, // bottom-left
-		1.0f, 0.0f, // bottom-right
-		1.0f, 1.0f, // top-right
-		0.0f, 1.0f, // top-left
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
 		// Back
-		0.0f, 0.0f, // bottom-left
-		1.0f, 0.0f, // bottom-right
-		1.0f, 1.0f, // top-right
-		0.0f, 1.0f, // top-left
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
 		// Front
-		0.0f, 0.0f, // bottom-left
-		1.0f, 0.0f, // bottom-right
-		1.0f, 1.0f, // top-right
-		0.0f, 1.0f  // top-left
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f
 	};
 
 	// OpenGL buffers
@@ -161,7 +161,7 @@ struct Cube {
 	GLuint programID;
 
 	void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms, float scale, float height, const char * filepath) {
-		// Define scale of the skybox geometry
+		// Set the instance Matrices
 		this->instanceTransforms = instanceTransforms;
 
 		// Create a vertex array object
@@ -190,30 +190,28 @@ struct Cube {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
-		// Create and compile our GLSL program from the shaders
-		this->programID = programID;
-
-		// Get a handle for our "MVP" uniforms
-		cameraMatrixID = glGetUniformLocation(programID, "camera");
-
-		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox(filepath);
-
-		// Get a handle for our "textureSampler" uniform
-		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
-		baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
-		isLightID = glGetUniformLocation(programID, "isLight");
-
 		// Create instance buffer
 		glGenBuffers(1, &instanceBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, instanceBufferID);
 		glBufferData(GL_ARRAY_BUFFER, instanceTransforms.size() * sizeof(glm::mat4), instanceTransforms.data(), GL_STATIC_DRAW);
 
-		for (int i = 0; i < 4; ++i) { // mat4 occupies 4 vec4s
+		for (int i = 0; i < 4; ++i) {
 			glEnableVertexAttribArray(3 + i);
 			glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
-			glVertexAttribDivisor(3 + i, 1); // One per instance
+			glVertexAttribDivisor(3 + i, 1);
 		}
+
+		// Create and compile our GLSL program from the shaders
+		this->programID = programID;
+
+		// Load the texture into GPU memory
+		textureID = LoadTextureTileBox(filepath);
+
+		// Get a handle for GLSL variables
+		cameraMatrixID = glGetUniformLocation(programID, "camera");
+		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+		baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
+		isLightID = glGetUniformLocation(programID, "isLight");
 	}
 
 	void updateInstances(const std::vector<glm::mat4>& instanceTransforms) {
@@ -227,8 +225,6 @@ struct Cube {
 			glBufferData(GL_ARRAY_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
 			currentBufferSize = newSize;
 		}
-
-		// Update the buffer content
 		glBufferSubData(GL_ARRAY_BUFFER, 0, newSize, instanceTransforms.data());
 	}
 
@@ -247,15 +243,10 @@ struct Cube {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
-		// Pass in model-view-projection matrix
-		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
-
-		// Enable UV buffer and texture sampler
 		glEnableVertexAttribArray(2);
 		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// Set textureSampler to use texture unit 0
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glUniform1i(textureSamplerID, 0);
@@ -268,15 +259,15 @@ struct Cube {
 			glVertexAttribDivisor(3 + i, 1);
 		}
 
+		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
+
 		// Set base colour factor to opaque
 		glm::vec4 baseColorFactor = glm::vec4(1.0);
 		glUniform4fv(baseColorFactorID, 1, &baseColorFactor[0]);
 		glUniform1i(isLightID, 0);
 
-		// Draw the plane
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0, instanceTransforms.size());
 
-		// Reset state
 		for (int i = 0; i < 4; ++i) {
 			glDisableVertexAttribArray(3 + i);
 		}
@@ -288,7 +279,6 @@ struct Cube {
 	void renderDepth(GLuint programID, GLuint lightMatID, const glm::mat4& lightSpaceMatrix) {
 		glUseProgram(programID);
 
-		// Pass the MVP matrix to the shader
 		glUniformMatrix4fv(lightMatID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
 
 		glEnableVertexAttribArray(0);
@@ -306,7 +296,6 @@ struct Cube {
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0, instanceTransforms.size());
 		glDisableVertexAttribArray(0);
 
-		// Reset state
 		for (int i = 0; i < 4; ++i) {
 			glDisableVertexAttribArray(3 + i);
 		}
@@ -319,9 +308,8 @@ struct Cube {
 		glDeleteBuffers(1, &normalBufferID);
 		glDeleteBuffers(1, &indexBufferID);
 		glDeleteBuffers(1, &instanceBufferID);
-		glDeleteVertexArrays(1, &vertexArrayID);
 		glDeleteBuffers(1, &uvBufferID);
 		glDeleteTextures(1, &textureID);
-		glDeleteProgram(programID);
+		glDeleteVertexArrays(1, &vertexArrayID);
 	}
 };

@@ -16,12 +16,16 @@ const vec4 FOG_COLOUR = vec4(0.004f, 0.02f, 0.05f, 0.0);
 
 void main()
 {
+    // Fogging
     vec3 fragPosition = vec3(modelMatrix * vec4(worldPosition, 1.0));
     float distanceToCamera = length(fragPosition - cameraPosition);
     float fogFactor = smoothstep(FOG_MIN_DIST, FOG_MAX_DIST, distanceToCamera);
 
+    // Texture (use instance alpha)
     vec4 texColor = texture(textureSampler, uv);
     vec4 fragColor = vec4(texColor.rgb, texColor.a * alpha);
+
+    // Discard fragments that are barely visible
     if (fragColor.a < 0.01) {
         discard;
     }

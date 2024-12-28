@@ -55,15 +55,8 @@ struct ParticleSystem {
 	GLuint programID;
 
 	void initialize(glm::vec3 center) {
-		programID = LoadShadersFromFile("../final/shader/particle.vert", "../final/shader/particle.frag");
-		if (programID == 0)
-		{
-			std::cerr << "Failed to load main shaders." << std::endl;
-		}
-
-		this->center = center;
-
 		// Initialize particles
+		this->center = center;
 		initializeParticles(1000);
 
 		// Create a vertex array object
@@ -85,25 +78,15 @@ struct ParticleSystem {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
-		// Get a handle for our "MVP" uniforms
-		cameraMatrixID = glGetUniformLocation(programID, "cameraMVP");
-		cameraPositionID = glGetUniformLocation(programID, "cameraPos");
-
-		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox("../final/assets/particle.png");
-
-		// Get a handle for our "textureSampler" uniform
-		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
-
 		// Create instance buffer
 		glGenBuffers(1, &instanceBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, instanceBufferID);
 		glBufferData(GL_ARRAY_BUFFER, instanceTransforms.size() * sizeof(glm::mat4), instanceTransforms.data(), GL_STATIC_DRAW);
 
-		for (int i = 0; i < 4; ++i) { // mat4 occupies 4 vec4s
+		for (int i = 0; i < 4; ++i) {
 			glEnableVertexAttribArray(3 + i);
 			glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
-			glVertexAttribDivisor(3 + i, 1); // One per instance
+			glVertexAttribDivisor(3 + i, 1);
 		}
 
 		// Create alpha buffer
@@ -114,12 +97,28 @@ struct ParticleSystem {
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(float), (void*)0);
 		glVertexAttribDivisor(1, 1);
+
+		// Create and compile our GLSL program from the shaders
+		programID = LoadShadersFromFile("../final/shader/particle.vert", "../final/shader/particle.frag");
+		if (programID == 0)
+		{
+			std::cerr << "Failed to load main shaders." << std::endl;
+		}
+
+		// Load the texture into GPU memory
+		textureID = LoadTextureTileBox("../final/assets/particle.png");
+
+		// Get a handle for GLSL variables
+		cameraMatrixID = glGetUniformLocation(programID, "cameraMVP");
+		cameraPositionID = glGetUniformLocation(programID, "cameraPos");
+		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
 	}
 
 	void initializeParticles(int amount) {
 		for (int i = 0; i < amount; ++i) {
 			Particle p;
 
+			// Set attributes for each particle
 			float angle = static_cast<float>(rand()) / RAND_MAX * 2.0f * glm::pi<float>();
 			float radius = static_cast<float>(rand()) / RAND_MAX * 200.0f;
 			float randomX = radius * cos(angle);
@@ -203,7 +202,7 @@ struct ParticleSystem {
 				// Move particle upward
 				particle.position.y += particle.speed * deltaTime;
 
-				// Optional: Add slight horizontal drift
+				// Add slight horizontal drift
 				float drift = (rand() % 2 == 0 ? 1 : -1) * 0.5f * deltaTime;
 				particle.position.x += drift;
 
@@ -217,10 +216,10 @@ struct ParticleSystem {
 			transform = glm::translate(transform, particle.position);
 			transform = glm::scale(transform, particle.scale);
 			instanceTransforms[i] = transform;
-			alphas[i] = particle.alpha;
+			alphas[i] = particle.alpha; // Store the computed alpha
 		}
 
-		// Update instance buffer
+		// Update instance and alpha buffers
 		updateInstances(instanceTransforms, alphas);
 	}
 
@@ -237,16 +236,10 @@ struct ParticleSystem {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
-		// Pass in model-view-projection matrix
-		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
-		glUniform3fv(cameraPositionID, 1, &cameraPos[0]);
-
-		// Enable UV buffer and texture sampler
 		glEnableVertexAttribArray(2);
 		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// Set textureSampler to use texture unit 0
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glUniform1i(textureSamplerID, 0);
@@ -265,10 +258,11 @@ struct ParticleSystem {
 		glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(float), (void*)0);
 		glVertexAttribDivisor(1, 1);
 
-		// Draw the plane
+		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
+		glUniform3fv(cameraPositionID, 1, &cameraPos[0]);
+
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0, instanceTransforms.size());
 
-		// Reset state
 		for (int i = 0; i < 4; ++i) {
 			glDisableVertexAttribArray(3 + i);
 		}

@@ -11,6 +11,7 @@ struct AnimatedModel {
 	GLuint jointMatricesID;
 	GLuint lightPositionID;
 	GLuint lightIntensityID;
+	GLuint cameraPositionID;
 	GLuint textureSamplerID;
 	GLuint programID;
 
@@ -56,7 +57,7 @@ struct AnimatedModel {
 		int targetNode;
 	};
 	struct AnimationObject {
-		std::vector<SamplerObject> samplers;	// Animation data
+		std::vector<SamplerObject> samplers;
 	};
 	std::vector<AnimationObject> animationObjects;
 
@@ -85,16 +86,9 @@ struct AnimatedModel {
 		int nodeIndex,
 		std::vector<glm::mat4>& localTransforms)
 	{
-		// DONE: Local Transforms
 		const tinygltf::Node& node = model.nodes[nodeIndex];
-
-		// Get the local transform for the node (including translation, rotation, and scale)
 		glm::mat4 localTransform = getNodeTransform(node);
-
-		// Store the local transformation
 		localTransforms[nodeIndex] = localTransform;
-
-		// If the node has a child, recursively compute its local transform
 		for (int childIndex : node.children) {
 			computeLocalNodeTransform(model, childIndex, localTransforms);
 		}
@@ -105,16 +99,9 @@ struct AnimatedModel {
 		int nodeIndex, const glm::mat4& parentTransform,
 		std::vector<glm::mat4>& globalTransforms)
 	{
-		// DONE: Global Transforms
 		const tinygltf::Node& node = model.nodes[nodeIndex];
-
-		// The global transform is the parent's transform multiplied by the node's local transform
 		glm::mat4 globalTransform = parentTransform * localTransforms[nodeIndex];
-
-		// Store the global transformation
 		globalTransforms[nodeIndex] = globalTransform;
-
-		// If the node has a child, recursively compute its global transform
 		for (int childIndex : node.children) {
 			computeGlobalNodeTransform(model, localTransforms, childIndex, globalTransform, globalTransforms);
 		}
@@ -122,8 +109,6 @@ struct AnimatedModel {
 
 	std::vector<SkinObject> prepareSkinning(const tinygltf::Model& model) {
 		std::vector<SkinObject> skinObjects;
-
-		// In our Blender exporter, the default number of joints that may influence a vertex is set to 4, just for convenient implementation in shaders.
 
 		for (size_t i = 0; i < model.skins.size(); i++) {
 			SkinObject skinObject;
@@ -289,7 +274,7 @@ struct AnimatedModel {
 			const unsigned char* outputPtr = &outputBuffer.data[outputBufferView.byteOffset + outputAccessor.byteOffset];
 			const float* outputBuf = reinterpret_cast<const float*>(outputPtr);
 
-			// DONE: Add interpolation for smooth interpolation
+			// Add interpolation for smooth interpolation
 			if (channel.target_path == "translation") {
 				// Get the translation data
 				glm::vec3 translation0, translation1;
@@ -333,7 +318,7 @@ struct AnimatedModel {
 	}
 
 	void updateSkinning(const std::vector<glm::mat4>& nodeTransforms) {
-		// DONE: Recompute joint matrices
+		// Recompute joint matrices
 
 		for (auto& skinObject : skinObjects) {
 			const tinygltf::Skin& skin = model.skins[0];
@@ -356,8 +341,6 @@ struct AnimatedModel {
 	}
 
 	void update(float time) {
-		// DONE: Implement update function
-
 		// Update node transforms using the active animation
 		const tinygltf::Skin& skin = model.skins[0];
 		std::vector<glm::mat4> nodeTransforms(model.nodes.size(), glm::mat4(1.0f));
@@ -416,11 +399,9 @@ struct AnimatedModel {
 			glGenTextures(1, &texID);
 			glBindTexture(GL_TEXTURE_2D, texID);
 
-			// Upload texture data to OpenGL
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0,
 				GL_RGBA, GL_UNSIGNED_BYTE, image.image.data());
 
-			// Set texture parameters
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -429,7 +410,7 @@ struct AnimatedModel {
 			glGenerateMipmap(GL_TEXTURE_2D);
 
 			textureIDs[i] = texID;
-			glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 
 		return textureIDs;
@@ -442,7 +423,7 @@ struct AnimatedModel {
 		glm::vec3 wave700(205.0f, 0.0f, 0.0f);
 		this->lightIntensity = 5.0f * (10.0f * wave500 + 10.0f * wave600 + 10.0f * wave700);
 
-		// Modify your path if needed
+		// Load model from file
 		if (!loadModel(model, filepath)) {
 			return;
 		}
@@ -473,6 +454,7 @@ struct AnimatedModel {
 		jointMatricesID = glGetUniformLocation(programID, "jointMatrices");
 		lightPositionID = glGetUniformLocation(programID, "lightPosition");
 		lightIntensityID = glGetUniformLocation(programID, "lightIntensity");
+		cameraPositionID = glGetUniformLocation(programID, "cameraPosition");
 		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
 	}
 
@@ -485,9 +467,9 @@ struct AnimatedModel {
 
 		// Enable and set instance attributes (4x vec4 for mat4)
 		for (int i = 0; i < 4; i++) {
-			glEnableVertexAttribArray(5 + i); // Instance matrix starts at location 5
+			glEnableVertexAttribArray(5 + i);
 			glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
-			glVertexAttribDivisor(5 + i, 1); // Advance per instance
+			glVertexAttribDivisor(5 + i, 1);
 		}
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -499,17 +481,14 @@ struct AnimatedModel {
 		for (auto& primitive : primitiveObjects) {
 			glBindBuffer(GL_ARRAY_BUFFER, primitive.instanceVBO);
 
-			// Update instance matrices data
+			// Check if the data size has changed
 			if (newInstanceMatrices.size() <= primitive.instanceCount) {
-				// Update the existing buffer
 				glBufferSubData(GL_ARRAY_BUFFER, 0, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data());
-			}
-			else {
-				// Reallocate the buffer if the size increases
+			} else {
+				// Reallocate buffer if so
 				glBufferData(GL_ARRAY_BUFFER, newInstanceMatrices.size() * sizeof(glm::mat4), newInstanceMatrices.data(), GL_DYNAMIC_DRAW);
 			}
 
-			// Update instance count
 			primitive.instanceCount = newInstanceMatrices.size();
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
@@ -569,7 +548,6 @@ struct AnimatedModel {
 				}
 			}
 
-			// Record VAO and texture for later use
 			PrimitiveObject primitiveObject;
 			primitiveObject.vao = vao;
 			primitiveObject.vbos = vbos;
@@ -607,9 +585,7 @@ struct AnimatedModel {
 	std::vector<PrimitiveObject> bindModel(tinygltf::Model& model) {
 		std::vector<PrimitiveObject> primitiveObjects;
 
-		// Load textures
 		std::vector<GLuint> textureIDs = loadTextures(model);
-
 		const tinygltf::Scene& scene = model.scenes[model.defaultScene];
 		for (size_t i = 0; i < scene.nodes.size(); ++i) {
 			assert((scene.nodes[i] >= 0) && (scene.nodes[i] < model.nodes.size()));
@@ -686,8 +662,7 @@ struct AnimatedModel {
 		glm::mat4 mvp = cameraMatrix;
 		glUniformMatrix4fv(mvpMatrixID, 1, GL_FALSE, &mvp[0][0]);
 
-		// DONE: Set animation data for linear blend skinning in shader
-
+		// Set animation data for linear blend skinning in shader
 		for (size_t skinIndex = 0; skinIndex < skinObjects.size(); ++skinIndex) {
 			const SkinObject& skin = skinObjects[skinIndex];
 
@@ -696,10 +671,10 @@ struct AnimatedModel {
 				&skin.jointMatrices[0][0][0]);
 		}
 
-		// Set light data 
+		// Set light data
 		glUniform3fv(lightPositionID, 1, &lightPosition[0]);
 		glUniform3fv(lightIntensityID, 1, &lightIntensity[0]);
-		glUniform3fv(glGetUniformLocation(programID, "cameraPosition"), 1, &cameraPos[0]);
+		glUniform3fv(cameraPositionID, 1, &cameraPos[0]);
 
 		// Draw the GLTF model
 		drawModel(primitiveObjects, model);

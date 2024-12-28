@@ -19,6 +19,7 @@ struct Plane {
 	};
 
 	GLfloat normal_buffer_data[12] = {
+		// All pointing upward
 		0.0f, 1.0f, 0.0f,
 		0.0f, 1.0f, 0.0f,
 		0.0f, 1.0f, 0.0f,
@@ -31,10 +32,10 @@ struct Plane {
 	};
 
 	GLfloat uv_buffer_data[8] = {
-		0.0f, 0.0f, // bottom-left
-		4.0f, 0.0f, // bottom-right
-		4.0f, 4.0f, // top-right
-		0.0f, 4.0f  // top-left
+		0.0f, 0.0f,
+		4.0f, 0.0f,
+		4.0f, 4.0f,
+		0.0f, 4.0f
 	};
 
 	// OpenGL buffers
@@ -53,7 +54,7 @@ struct Plane {
 	GLuint programID;
 
 	void initialize(GLuint programID, const std::vector<glm::mat4>& instanceTransforms) {
-		// Define scale of the skybox geometry
+		// Set the instance Matrices
 		this->instanceTransforms = instanceTransforms;
 
 		// Create a vertex array object
@@ -80,30 +81,28 @@ struct Plane {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer_data), index_buffer_data, GL_STATIC_DRAW);
 
-		// Create and compile our GLSL program from the shaders
-		this->programID = programID;
-
-		// Get a handle for our "MVP" uniforms
-		cameraMatrixID = glGetUniformLocation(programID, "camera");
-
-		// Load a random texture into the GPU memory
-		textureID = LoadTextureTileBox("../final/assets/ground.jpg");
-
-		// Get a handle for our "textureSampler" uniform
-		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
-		baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
-		isLightID = glGetUniformLocation(programID, "isLight");
-
 		// Create instance buffer
 		glGenBuffers(1, &instanceBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, instanceBufferID);
 		glBufferData(GL_ARRAY_BUFFER, instanceTransforms.size() * sizeof(glm::mat4), instanceTransforms.data(), GL_STATIC_DRAW);
 
-		for (int i = 0; i < 4; ++i) { // mat4 occupies 4 vec4s
+		for (int i = 0; i < 4; ++i) {
 			glEnableVertexAttribArray(3 + i);
 			glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
-			glVertexAttribDivisor(3 + i, 1); // One per instance
+			glVertexAttribDivisor(3 + i, 1);
 		}
+
+		// Create and compile our GLSL program from the shaders
+		this->programID = programID;
+
+		// Load the texture into GPU memory
+		textureID = LoadTextureTileBox("../final/assets/ground.jpg");
+
+		// Get a handle for GLSL variables
+		cameraMatrixID = glGetUniformLocation(programID, "camera");
+		textureSamplerID = glGetUniformLocation(programID, "textureSampler");
+		baseColorFactorID = glGetUniformLocation(programID, "baseColorFactor");
+		isLightID = glGetUniformLocation(programID, "isLight");
 	}
 
 	void updateInstances(const std::vector<glm::mat4>& instanceTransforms) {
@@ -113,12 +112,10 @@ struct Plane {
 		static size_t currentBufferSize = 0;
 		size_t newSize = instanceTransforms.size() * sizeof(glm::mat4);
 		if (newSize > currentBufferSize) {
-			// Reallocate buffer if needed
+			// Reallocate buffer if so
 			glBufferData(GL_ARRAY_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
 			currentBufferSize = newSize;
 		}
-
-		// Update the buffer content
 		glBufferSubData(GL_ARRAY_BUFFER, 0, newSize, instanceTransforms.data());
 	}
 
@@ -137,15 +134,10 @@ struct Plane {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferID);
 
-		// Pass in model-view-projection matrix
-		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
-
-		// Enable UV buffer and texture sampler
 		glEnableVertexAttribArray(2);
 		glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// Set textureSampler to use texture unit 0
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glUniform1i(textureSamplerID, 0);
@@ -158,15 +150,15 @@ struct Plane {
 			glVertexAttribDivisor(3 + i, 1);
 		}
 
+		glUniformMatrix4fv(cameraMatrixID, 1, GL_FALSE, &cameraMatrix[0][0]);
+
 		// Set base colour factor to opaque
 		glm::vec4 baseColorFactor = glm::vec4(1.0);
 		glUniform4fv(baseColorFactorID, 1, &baseColorFactor[0]);
 		glUniform1i(isLightID, 0);
 
-		// Draw the plane
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0, instanceTransforms.size());
 
-		// Reset state
 		for (int i = 0; i < 4; ++i) {
 			glDisableVertexAttribArray(3 + i);
 		}
@@ -178,7 +170,6 @@ struct Plane {
 	void renderDepth(GLuint programID, GLuint lightMatID, const glm::mat4& lightSpaceMatrix) {
 		glUseProgram(programID);
 
-		// Pass the MVP matrix to the shader
 		glUniformMatrix4fv(lightMatID, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
 
 		glEnableVertexAttribArray(0);
@@ -196,7 +187,6 @@ struct Plane {
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0, instanceTransforms.size());
 		glDisableVertexAttribArray(0);
 
-		// Reset state
 		for (int i = 0; i < 4; ++i) {
 			glDisableVertexAttribArray(3 + i);
 		}

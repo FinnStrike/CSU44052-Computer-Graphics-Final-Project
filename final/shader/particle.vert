@@ -15,6 +15,7 @@ uniform mat4 cameraMVP;
 uniform vec3 cameraPos;
 
 void main() {
+	// Compute rotation matrix to ensure vertex faces the camera
     vec3 position = vec3(instanceMatrix[3]);
 	vec3 toCamera = normalize(cameraPos - position);
 	vec3 up = vec3(0.0, 1.0, 0.0);
