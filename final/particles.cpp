@@ -19,11 +19,13 @@ struct ParticleSystem {
 	std::vector<float> alphas;
 	std::vector<Particle> particles;
 
+	glm::vec3 center;
+
 	GLfloat vertex_buffer_data[12] = {
-		-5.0f, -5.0f, 0.0f, // bottom-left
-		 5.0f, -5.0f, 0.0f, // bottom-right
-		 5.0f,  5.0f, 0.0f, // top-right
-		-5.0f,  5.0f, 0.0f  // top-left
+		-0.5f, -0.5f, 0.0f, // bottom-left
+		 0.5f, -0.5f, 0.0f, // bottom-right
+		 0.5f,  0.5f, 0.0f, // top-right
+		-0.5f,  0.5f, 0.0f  // top-left
 	};
 
 	GLuint index_buffer_data[6] = {
@@ -52,15 +54,17 @@ struct ParticleSystem {
 	GLuint textureSamplerID;
 	GLuint programID;
 
-	void initialize() {
+	void initialize(glm::vec3 center) {
 		programID = LoadShadersFromFile("../final/shader/particle.vert", "../final/shader/particle.frag");
 		if (programID == 0)
 		{
 			std::cerr << "Failed to load main shaders." << std::endl;
 		}
 
+		this->center = center;
+
 		// Initialize particles
-		initializeParticles(100);
+		initializeParticles(1000);
 
 		// Create a vertex array object
 		glGenVertexArrays(1, &vertexArrayID);
@@ -116,22 +120,24 @@ struct ParticleSystem {
 		for (int i = 0; i < amount; ++i) {
 			Particle p;
 
-			// Randomize the particle's position
-			float randomX = -200.0f + static_cast<float>(rand() % 401);  // Random between -200 and 200
-			float randomZ = -200.0f + static_cast<float>(rand() % 401);  // Random between -200 and 200
-			float randomStartHeight = 0.0f + static_cast<float>(rand() % 50); // Random between 0 and 50
-			float randomSpeed = 10.0f + static_cast<float>(rand() % 40);       // Random speed between 10 and 50
-			float randomLifetime = 3.0f + static_cast<float>(rand() % 5); // Random lifetime between 3 and 8 seconds
+			float angle = static_cast<float>(rand()) / RAND_MAX * 2.0f * glm::pi<float>();
+			float radius = static_cast<float>(rand()) / RAND_MAX * 200.0f;
+			float randomX = radius * cos(angle);
+			float randomZ = radius * sin(angle);
+			float randomStartHeight = 0.0f + static_cast<float>(rand() % 50);
+			float randomSpeed = 5.0f + static_cast<float>(rand() % 15);
+			float randomLifetime = static_cast<float>(rand() % 10);
 
-			p.position = glm::vec3(randomX, randomStartHeight, randomZ);
+			p.position = glm::vec3(center.x + randomX, randomStartHeight, center.z + randomZ);
 			p.scale = glm::vec3(1.0f);
 			p.speed = randomSpeed;
-			p.lifetime = randomLifetime;
 			p.currentTime = 0.0f;
-			
+
 			float distanceFromCenter = glm::length(glm::vec2(randomX, randomZ));
-			float maxDistance = 282.84f;
-			p.alpha = 1.0f - (distanceFromCenter / maxDistance);
+			float maxDistance = 200.0f;
+			p.lifetime = glm::mix(2.0f, 10.0f, 1.0f - (distanceFromCenter / maxDistance));
+			p.lifetime += randomLifetime;
+			p.alpha = 0.6f - (distanceFromCenter / maxDistance);
 			p.alpha = glm::clamp(p.alpha, 0.0f, 1.0f);
 
 			particles.push_back(p);
@@ -141,7 +147,7 @@ struct ParticleSystem {
 			transform = glm::translate(transform, p.position);
 			transform = glm::scale(transform, p.scale);
 			instanceTransforms.push_back(transform);
-			alphas.push_back(p.alpha);
+			alphas.push_back(p.alpha);  // Store the computed alpha
 		}
 	}
 
@@ -175,19 +181,22 @@ struct ParticleSystem {
 			particle.currentTime += deltaTime;
 			if (particle.currentTime >= particle.lifetime) {
 				// Reset the particle
-				float randomX = -200.0f + static_cast<float>(rand() % 401);  // Random between -200 and 200
-				float randomZ = -200.0f + static_cast<float>(rand() % 401);  // Random between -200 and 200
-				float randomStartHeight = 0.0f + static_cast<float>(rand() % 50); // Random between 0 and 50
-				float randomSpeed = 10.0f + static_cast<float>(rand() % 40);       // Random speed between 10 and 50
-				float randomLifetime = 3.0f + static_cast<float>(rand() % 5); // Random lifetime between 3 and 8 seconds
-				particle.position = glm::vec3(randomX, randomStartHeight, randomZ);
+				float angle = static_cast<float>(rand()) / RAND_MAX * 2.0f * glm::pi<float>();
+				float radius = static_cast<float>(rand()) / RAND_MAX * 200.0f;
+				float randomX = radius * cos(angle);
+				float randomZ = radius * sin(angle);
+				float randomStartHeight = 0.0f + static_cast<float>(rand() % 50);
+				float randomSpeed = 5.0f + static_cast<float>(rand() % 15);
+				float randomLifetime = static_cast<float>(rand() % 10);
+				particle.position = glm::vec3(center.x + randomX, randomStartHeight, center.z + randomZ);
 				particle.scale = glm::vec3(1.0f);
 				particle.speed = randomSpeed;
-				particle.lifetime = randomLifetime;
 				particle.currentTime = 0.0f;
 				float distanceFromCenter = glm::length(glm::vec2(randomX, randomZ));
-				float maxDistance = 282.84f;
-				particle.alpha = 1.0f - (distanceFromCenter / maxDistance);
+				float maxDistance = 200.0f;
+				particle.lifetime = glm::mix(2.0f, 10.0f, 1.0f - (distanceFromCenter / maxDistance));
+				particle.lifetime += randomLifetime;
+				particle.alpha = 0.6f - (distanceFromCenter / maxDistance);
 				particle.alpha = glm::clamp(particle.alpha, 0.0f, 1.0f);
 			}
 			else {
@@ -199,7 +208,7 @@ struct ParticleSystem {
 				particle.position.x += drift;
 
 				// Fade towards death
-				particle.alpha = 1.0f - (particle.currentTime / particle.lifetime);
+				particle.alpha = 0.6f - (particle.currentTime / particle.lifetime)*0.6f;
 				particle.alpha = glm::clamp(particle.alpha, 0.0f, 1.0f);
 			}
 

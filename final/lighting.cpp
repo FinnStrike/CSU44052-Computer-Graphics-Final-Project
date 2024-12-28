@@ -3,6 +3,7 @@
 #include <model.cpp>
 #include <cube.cpp>
 #include <ground.cpp>
+#include <particles.cpp>
 
 struct Light {
     glm::vec3 position;
@@ -56,7 +57,7 @@ public:
         }
     }
 
-    void addLight(glm::vec3 position, glm::vec3 intensity, float exposure) {
+    void addLight(glm::vec3 position, glm::vec3 intensity, float exposure, std::vector<ParticleSystem>& particleSystems) {
         // Check if light already exists
         for (const auto& existingLight : lights) {
             if (glm::distance(existingLight.position, position) < 0.1f) {
@@ -94,24 +95,30 @@ public:
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        ParticleSystem particles;
+        particles.initialize(glm::vec3(position.x, 0.0f, position.z));
+        particleSystems.push_back(particles);
         
         lights.push_back(light);
     }
 
     // Remove lights that are outside the 5x5 grid centered around the camera
-    void removeLightsOutsideGrid(int centerX, int centerY, float tileSize) {
+    void removeLightsOutsideGrid(int centerX, int centerY, float tileSize, std::vector<ParticleSystem>& particleSystems) {
         std::vector<Light> remainingLights;
-        for (const auto& light : lights) {
-            int lightX = static_cast<int>(round(light.position.x / tileSize));
-            int lightY = static_cast<int>(round(light.position.z / tileSize));
+        std::vector<ParticleSystem> remainingParticles;
+        for (int i = 0; i < lights.size(); i++) {
+            int lightX = static_cast<int>(round(lights[i].position.x / tileSize));
+            int lightY = static_cast<int>(round(lights[i].position.z / tileSize));
 
             // Keep lights within the 5x5 grid range centered on (centerX, centerY)
             if (abs(lightX - centerX) <= 2 && abs(lightY - centerY) <= 2) {
-                remainingLights.push_back(light);
+                remainingLights.push_back(lights[i]);
+                remainingParticles.push_back(particleSystems[i]);
             }
         }
-
         lights = remainingLights;
+        particleSystems = remainingParticles;
     }
 
     void performShadowPass(glm::mat4 lightProjection, std::vector<StaticModel> models, std::vector<Cube> cubes) {

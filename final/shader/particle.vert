@@ -5,6 +5,9 @@ layout(location = 1) in float instanceAlpha;
 layout(location = 2) in vec2 vertexUV;
 layout(location = 3) in mat4 instanceMatrix;
 
+out vec3 worldPosition;
+out mat4 modelMatrix;
+out vec3 cameraPosition;
 out vec2 uv;
 out float alpha;
 
@@ -24,6 +27,9 @@ void main() {
 
     gl_Position = cameraMVP * instanceMatrix * rotationMatrix * vec4(vertexPosition, 1);
 
+	worldPosition = vertexPosition;
+	modelMatrix = instanceMatrix * rotationMatrix;
+	cameraPosition = cameraPos;
     uv = vertexUV;
 	alpha = instanceAlpha;
 }

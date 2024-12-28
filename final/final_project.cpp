@@ -3,7 +3,6 @@
 #include <camera.cpp>
 #include <skybox.cpp>
 #include <bot.cpp>
-#include <particles.cpp>
 #include <lighting.cpp>
 
 static GLFWwindow* window;
@@ -57,6 +56,9 @@ static float playbackSpeed = 2.0f;
 // Set up Camera
 Camera camera(eye_center, lookat, up, FoV, zNear, zFar, static_cast<float>(windowWidth) / windowHeight);
 
+// Set up Particle Systems
+std::vector<ParticleSystem> particleSystems;
+
 // Utility to hash tile coordinates for std::unordered_set
 struct TileCoord {
 	int x, y;
@@ -103,7 +105,7 @@ void generateStools(int x, int y, std::vector<glm::mat4>& sts) {
 void generateLights(int x, int y, Lighting& lighting) {
 	glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x * tileSize, 0.0f, y * tileSize));
 	glm::vec3 p = glm::vec3(t * glm::vec4(lightPosition, 1.0f));
-	lighting.addLight(p, lightIntensity, exposure);
+	lighting.addLight(p, lightIntensity, exposure, particleSystems);
 }
 
 // Update visible tiles
@@ -119,7 +121,7 @@ void updateTiles(const glm::vec3& cameraPos, std::vector<glm::mat4>& gts, std::v
 	cts.clear();
 	lts.clear();
 	sts.clear();
-	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize);
+	lighting.removeLightsOutsideGrid(centerTileX, centerTileY, tileSize, particleSystems);
 
 	// Generate a 3x3 grid of tiles centered on the closest tile
 	for (int x = centerTileX - 4; x <= centerTileX + 4; ++x) {
@@ -227,10 +229,6 @@ int main(void)
 	std::vector<Cube> cubes;
 	cubes.push_back(building);
 
-	// Create a particle system
-	ParticleSystem particleSystem;
-	particleSystem.initialize();
-
 	// Camera setup
 	glm::mat4 viewMatrix, projectionMatrix, lightProjection;
 	projectionMatrix = camera.getProjectionMatrix();
@@ -285,7 +283,7 @@ int main(void)
 		models.push_back(stool);
 		cubes.clear();
 		cubes.push_back(building);
-		particleSystem.update(deltaTime);
+		for (auto& particleSystem : particleSystems) particleSystem.update(deltaTime);
 
 		// Compute camera matrix
 		viewMatrix = camera.getViewMatrix();
@@ -303,7 +301,7 @@ int main(void)
 		building.render(vp);
 		stool.render(vp);
 		lamp.render(vp);
-		particleSystem.render(vp, cameraPos);
+		for (auto& particleSystem : particleSystems) particleSystem.render(vp, cameraPos);
 
 		// FPS tracking 
 		// Count number of frames over a few seconds and take average
@@ -332,7 +330,7 @@ int main(void)
 	ground.cleanup();
 	building.cleanup();
 	lighting.cleanup();
-	particleSystem.cleanup();
+	for (auto& particleSystem : particleSystems) particleSystem.cleanup();
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
