@@ -1,5 +1,18 @@
-# CSU4405 Computer Graphics
+# CSU44052 Computer Graphics
 ## Final Project
+
+This is my Final Project for CSU44052 Computer Graphics. It depicts an infinitely generating scene that demonstrates numerous OpenGL features such as geometry rendering, texture mapping, lighting and shadows, animation, instancing and particle systems. 
+
+### Compilation instructions
+*Requires CMAKE and WSL/Linux*
+Open a Command Line Terminal in the root directory.
+Execute `mkdir build` to create the build directory.
+Execute `cd build` to enter the build directory.
+Execute `cmake ..` inside the build directory to generate the makefile.
+Execute `make` inside the build directory to compile the application.
+Execute `./final_project` to run the application.
+
+## Specification
 
 In the final project, you will develop a computer graphics application to showcase the
 techniques you have learned in the module in a single framework.
