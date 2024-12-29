@@ -5,12 +5,12 @@ This is my Final Project for CSU44052 Computer Graphics. It depicts an infinitel
 
 ### Compilation instructions
 *Requires CMAKE and WSL/Linux*
-Open a Command Line Terminal in the root directory.
-Execute `mkdir build` to create the build directory.
-Execute `cd build` to enter the build directory.
-Execute `cmake ..` inside the build directory to generate the makefile.
-Execute `make` inside the build directory to compile the application.
-Execute `./final_project` to run the application.
+- Open a Command Line Terminal in the root directory.
+- Execute `mkdir build` to create the build directory.
+- Execute `cd build` to enter the build directory.
+- Execute `cmake ..` inside the build directory to generate the makefile.
+- Execute `make` inside the build directory to compile the application.
+- Execute `./final_project` to run the application.
 
 ## Specification
 
